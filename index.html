@@ -177,7 +177,7 @@ Jangan menjadi “part changer”. Jelaskan APA, MENGAPA, BAGAIMANA MEMBUKTIKAN,
 function buildExpertPrompt(question,v){
  const q=String(question||'').trim();
  const context=vehicleContext(v);
- return \`VEHICLE LIFEBOOK — AUTOMOTIVE MASTER INTELLIGENCE
+ return `VEHICLE LIFEBOOK — AUTOMOTIVE MASTER INTELLIGENCE
 
 ${MASTER_AUTOMOTIVE_INTELLIGENCE}
 
@@ -210,7 +210,7 @@ I. VALIDASI SETELAH PERBAIKAN / MODIFIKASI
 J. ESTIMASI BIAYA bila relevan
 K. PERTANYAAN LANJUTAN bila benar-benar diperlukan
 
-Gunakan Bahasa Indonesia natural, tegas, teknis, mudah dipahami. Hubungkan jawaban dengan kendaraan dan riwayat yang diberikan.\`;
+Gunakan Bahasa Indonesia natural, tegas, teknis, mudah dipahami. Hubungkan jawaban dengan kendaraan dan riwayat yang diberikan.`;
 }
 function openInlineVoice(targetId){
  const el=document.getElementById(targetId);
