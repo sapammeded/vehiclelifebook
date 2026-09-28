@@ -61,7 +61,7 @@ const SUPABASE_URL='https://oeuyhfuohaizwuljgzeg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
 // Welcome media: upload your own file to this exact repo path. No code change needed.
 const WELCOME_VIDEO='assets/welcome.mp4';
-const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',license:null};
+const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',license:null,maxVehicles:1,maxEvents:20};
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -248,7 +248,7 @@ async function resetPassword(){
  toast(error?error.message:'Link reset dikirim jika email terdaftar.');
 }
 
-async function afterLogin(){await loadVehicles();renderApp()}
+async function afterLogin(){await loadEntitlement();await loadVehicles();renderApp()}\nasync function loadEntitlement(){try{const {data,error}=await state.sb.rpc('get_my_entitlement');if(error)throw error;state.plan=data?.plan||'demo';state.license=data?.license_id||null;state.maxVehicles=Number(data?.max_vehicles||1);state.maxEvents=Number(data?.max_events||20)}catch(e){state.plan='demo';state.maxVehicles=1;state.maxEvents=20}}
 async function loadVehicles(){
  const {data,error}=await state.sb.from('vehicles').select('*').order('plate_number');
  if(error){toast(error.message);return}state.vehicles=data||[];
@@ -263,10 +263,10 @@ async function loadEvents(){
 
 function renderApp(){
  const v=state.vehicles.find(x=>x.id===state.selected);
- $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>Digital vehicle history</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
+ $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>${state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO'}</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
  <main class="wrap">
  <section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
- <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert</button><button class="tab" id="exportBtn">Export</button></div>
+ <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert ${state.plan==='pro'||state.plan==='owner'?'PRO':''}</button><button class="tab" id="exportBtn">Export</button></div>
  <div class="grid">
    <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
    <div class="card"><div class="small muted">Aktivitas</div><div class="kpi">${state.events.length}</div></div>
@@ -295,7 +295,7 @@ function modal(inner){
 }
 function closeModal(m){m?.remove()}
 
-function openVehicleModal(){
+function openVehicleModal(){\n if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas DEMO tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
  const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div>
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
@@ -311,7 +311,7 @@ function openVehicleModal(){
  };
 }
 
-function openEventModal(prefill={}){
+function openEventModal(prefill={}){\n if(state.plan!=='owner' && state.events.length>=state.maxEvents){openUpgradeModal('Batas aktivitas DEMO tercapai. Aktifkan PRO untuk mencatat tanpa batas.');return}
  const v=state.vehicles.find(x=>x.id===state.selected);
  if(!v){toast('Tambahkan kendaraan dulu');return}
  const m=modal(`<div class="row between"><h3>Tambah aktivitas</h3><button class="btn gray" data-close>✕</button></div>
@@ -377,6 +377,15 @@ function openVoiceModal(){
   const p=parseVoice(text);m.querySelector('#voicePreview').innerHTML=`<div class="card" style="box-shadow:none;background:#f8fafc"><div class="row between"><strong>Preview</strong><span class="badge warning">Belum disimpan</span></div><div class="two" style="margin-top:10px"><div><div class="small muted">Jenis</div><strong>${esc(p.type)}</strong></div><div><div class="small muted">Tanggal</div><strong>${esc(p.date)}</strong></div><div><div class="small muted">Judul</div><strong>${esc(p.title)}</strong></div><div><div class="small muted">Biaya</div><strong>${rupiah(p.cost)}</strong></div></div><div style="margin-top:10px" class="small">${esc(p.description)}</div><button class="btn primary" style="width:100%;margin-top:12px" id="confirmVoice">Konfirmasi & simpan</button></div>`;
   m.querySelector('#confirmVoice').onclick=()=>{closeModal(m);openEventModal(p)};
  };
+}
+
+function openUpgradeModal(msg){
+ const m=modal(`<div class="row between"><div><h3 style="margin:0">Vehicle Lifebook PRO</h3><div class="small muted">Unlock full vehicle intelligence</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="pro card" style="margin-top:12px"><strong>${esc(msg)}</strong><div class="small" style="margin-top:6px;opacity:.9">PRO membuka kendaraan & aktivitas tanpa batas, Automotive Expert, export PRO, voice dan fitur lanjutan.</div></div>
+ <div class="field" style="margin-top:14px"><label>Activation Code</label><input id="licenseCode" placeholder="VL-PRO-XXXX-XXXX"></div>
+ <button class="btn primary" style="width:100%" id="activateLicense">Aktifkan PRO</button>`);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#activateLicense').onclick=async()=>{const code=m.querySelector('#licenseCode').value.trim();if(!code){toast('Masukkan Activation Code');return}setBusy(true);try{const {data,error}=await state.sb.rpc('activate_license',{p_code:code});if(error)throw error;state.plan='pro';state.license=data?.license_id||code;state.maxVehicles=Number(data?.max_vehicles||999999);state.maxEvents=Number(data?.max_events||999999);closeModal(m);renderApp();toast('PRO berhasil diaktifkan')}catch(e){toast(e.message||'Activation gagal')}finally{setBusy(false)}};
 }
 
 function openExportModal(){
