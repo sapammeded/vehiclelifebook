@@ -138,16 +138,27 @@ I. PERTANYAAN LANJUTAN bila benar-benar diperlukan
 
 Gunakan Bahasa Indonesia yang natural, tegas, teknis, dan mudah dipahami. Jangan memberi jawaban generik. Hubungkan analisis dengan kendaraan dan riwayat yang diberikan.`;
 }
+function openInlineVoice(targetId){
+ const el=document.getElementById(targetId);
+ if(!el){return}
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){toast("Browser ini tidak mendukung voice input");return}
+ const r=new SR();
+ r.lang="id-ID";r.interimResults=false;r.continuous=false;
+ r.onresult=e=>{const s=e.results[0]&&e.results[0][0]?e.results[0][0].transcript:"";el.value=s;el.dispatchEvent(new Event("input",{bubbles:true}));};
+ r.onerror=e=>toast("Voice: "+e.error);
+ try{r.start()}catch(e){}
+}
 function openExpertModal(){
  if(state.plan!=='pro' && state.plan!=='owner'){openUpgradeModal('Automotive Expert adalah fitur PRO.');return}
  const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
  const m=modal(`<div class="row between"><div><h3 style="margin:0">💎 Automotive Expert</h3><div class="small muted">Universal Expert Prompt Engine</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="pro card" style="margin-top:12px"><strong>Tanya apa saja tentang kendaraan ini.</strong><div class="small" style="margin-top:5px;opacity:.9">Diagnosis · modifikasi · racing · styling · spare part · performa · risiko · maintenance</div></div>
- <div class="field" style="margin-top:12px"><label>Pertanyaan Anda</label><textarea id="expertQ" style="min-height:130px" placeholder="Contoh: Saya mau membuat PCX saya lebih ceper untuk gaya. Apa dampaknya terhadap handling, kenyamanan, komponen dan keselamatan?"></textarea></div>
+ <div class="field" style="margin-top:12px"><div class="row between"><label>Pertanyaan Anda</label><button class="btn gray" type="button" id="voiceExpert">🎙️ Voice</button></div><textarea id="expertQ" style="min-height:130px" placeholder="Ketik atau gunakan Voice."></textarea></div>
  <div class="small muted">Gunakan prompt ini di AI pilihan Anda untuk mendapatkan analisis otomotif mendalam berdasarkan kendaraan dan riwayatnya.</div>
  <button class="btn primary" style="width:100%;margin-top:12px" id="makePrompt">⚡ Buat Expert Prompt</button>
  <div id="expertResult" style="margin-top:12px"></div>`);
- m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceExpert').onclick=()=>openInlineVoice('expertQ');
  m.querySelector('#makePrompt').onclick=()=>{
    const q=m.querySelector('#expertQ').value.trim();if(!q){toast('Tulis pertanyaan dulu');return}
    const p=buildExpertPrompt(q,v);
