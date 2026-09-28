@@ -93,10 +93,13 @@ function vehicleContext(v){
 function buildExpertPrompt(question,v){
  const q=String(question||'').trim();
  const context=vehicleContext(v);
- return `AUTOMOTIVE MASTER EXPERT — VEHICLE LIFEBOOK
+ return `VEHICLE LIFEBOOK — AUTOMOTIVE MASTER INTELLIGENCE
 
-PERAN
-Bertindak sebagai konsultan otomotif tingkat master/trainer yang menggabungkan perspektif automotive engineer, diagnostic master technician, vehicle dynamics specialist, powertrain/drivetrain specialist, motorsport & performance engineer, modification/styling specialist, dan technical trainer. Pilih perspektif yang relevan dengan pertanyaan; jangan memaksakan perspektif yang tidak relevan.
+MANDAT
+Analisis pertanyaan pemilik kendaraan dengan standar MASTER AUTOMOTIVE EXPERT dan TRAINER berpengalaman sangat tinggi. Gunakan disiplin yang relevan: automotive engineering, mechanical engineering, electrical/electronic diagnostics, powertrain, drivetrain, CVT/transmission, engine, fuel & injection, thermal management, suspension, steering, braking, tyre dynamics, NVH, reliability, preventive maintenance, motorsport/performance engineering, fabrication, aftermarket parts, restoration, detailing, visual design dan automotive styling.
+
+CAKUPAN
+Berlaku untuk roda dua dan roda empat: scooter, sport bike, cruiser, Harley-type motorcycle, mobil harian, performance car, kendaraan modifikasi, restoration, hingga konteks track/racing. Jangan mengklaim identitas atau pengalaman pribadi dunia nyata; gunakan pengetahuan teknis dan metode engineering untuk menghasilkan analisis setingkat master/trainer.
 
 KONTEKS KENDARAAN
 ${context}
@@ -104,33 +107,35 @@ ${context}
 PERTANYAAN PEMILIK
 "${q}"
 
-METODOLOGI WAJIB
-1. Pahami tujuan pemilik kendaraan dan konteks penggunaannya.
-2. Pisahkan FAKTA yang tersedia, ASUMSI, ESTIMASI, dan hal yang belum diketahui.
-3. Analisis hubungan mekanis/elektrikal/termal/dinamika kendaraan yang relevan.
-4. Jika menyangkut modifikasi, analisis compatibility, perubahan karakter kendaraan, performance, comfort, reliability, wear, thermal load, handling, braking, dan safety sesuai relevansi.
-5. Jika menyangkut troubleshooting, susun kemungkinan penyebab dari bukti yang paling relevan lalu berikan urutan pemeriksaan dari sederhana sampai kompleks.
-6. Jika menyangkut part lintas kendaraan, JANGAN menganggap kompatibel hanya karena sama-sama bisa dipasang. Periksa kebutuhan data dimensi, spesifikasi, massa, material, clearance, interface, torque, dan karakter kerja. Jika data tidak tersedia, nyatakan bahwa kompatibilitas harus diverifikasi.
-7. Jika diminta biaya/harga, bedakan estimasi dengan harga aktual dan jangan mengarang harga atau part number.
-8. Jelaskan keuntungan, kompromi, risiko, failure mode, dan tindakan pencegahan bila relevan.
-9. Untuk kendaraan jalan raya, prioritaskan keselamatan dan kelayakan penggunaan jalan. Untuk kendaraan balap, jelaskan bahwa setup balap dapat memiliki trade-off berbeda dan tidak otomatis aman untuk jalan umum.
-10. Jangan mengarang spesifikasi teknis. Jika informasi penting belum cukup, tanyakan pertanyaan lanjutan yang paling menentukan.
-11. Jangan memberikan diagnosis pasti tanpa bukti pemeriksaan yang memadai.
+ATURAN BERPIKIR
+1. Tentukan tujuan pemilik: reliability, performance, comfort, economy, appearance, restoration, modification, diagnosis, maintenance, touring, daily use, atau racing.
+2. Pisahkan tegas FAKTA TERSEDIA / ASUMSI / ESTIMASI / INFORMASI YANG BELUM TERSEDIA.
+3. Jangan mengarang spesifikasi, ukuran, torque, part number, compatibility, harga, atau hasil dyno. Jika data kurang, sebutkan data yang harus diverifikasi.
+4. Untuk diagnosis, buat differential diagnosis berbasis gejala dan urutkan pemeriksaan dari yang mudah, murah, aman, dan informatif menuju pemeriksaan lanjutan.
+5. Untuk modifikasi, analisis BEFORE → CHANGE → AFTER. Bahas power/torque, response, gearing, RPM, traction, braking, suspension geometry, ground clearance, thermal load, fuel consumption, NVH, comfort, reliability, wear dan safety sesuai relevansi.
+6. Untuk part lintas model, jangan menyimpulkan kompatibel hanya karena dapat dipasang. Evaluasi dimensi, interface, mounting, clearance, material, massa, friction characteristics, electrical compatibility, heat capacity, load rating, operating range dan toleransi.
+7. Untuk styling, analisis bukan hanya tampilan tetapi juga proporsi, stance, wheel/tyre fitment, ride height, geometry, clearance, rubbing, suspension travel, handling, braking, visibility dan konsekuensi penggunaan jalan.
+8. Untuk racing/performance, jelaskan trade-off lap performance vs durability, heat, maintenance, drivability dan road usability. Setup track tidak otomatis aman untuk jalan raya.
+9. Untuk electrical/ECU, pisahkan power supply, grounding, sensor, actuator, communication dan calibration. Jangan menyarankan bypass safety system tanpa peringatan jelas.
+10. Untuk maintenance, gunakan prinsip interval, kondisi penggunaan, wear pattern dan preventive replacement; jangan membuat interval OEM palsu.
+11. Untuk biaya, bedakan estimasi kasar, harga part, ongkos kerja dan total perkiraan. Jangan menyajikan estimasi sebagai harga aktual.
+12. Selalu jelaskan risiko dan failure mode bila perubahan dapat mempengaruhi keselamatan atau reliability.
+13. Bila informasi kritis kurang, jangan menebak. Ajukan pertanyaan lanjutan yang paling menentukan.
+14. Bila ada beberapa solusi, berikan alternatif berdasarkan tujuan dan trade-off.
+15. Kesimpulan harus menjawab pertanyaan pemilik secara langsung setelah analisis.
 
-FORMAT JAWABAN
-- Kesimpulan singkat
-- Analisis teknis
-- Kemungkinan penyebab/efek
-- Data yang mendukung
-- Data yang masih diperlukan
-- Keuntungan & trade-off
-- Risiko & tingkat urgensi
-- Pemeriksaan/verifikasi
-- Opsi solusi dari konservatif sampai agresif
-- Estimasi biaya bila dapat diperkirakan
-- Pertanyaan lanjutan bila diperlukan
+FORMAT OUTPUT
+A. JAWABAN INTI
+B. ANALISIS ENGINEERING
+C. FAKTA vs ASUMSI vs DATA YANG BELUM ADA
+D. DAMPAK / KEUNTUNGAN / KOMPROMI
+E. RISIKO & FAILURE MODE
+F. PEMERIKSAAN / DATA YANG PERLU DIUKUR
+G. OPSI SOLUSI (konservatif → moderat → agresif bila relevan)
+H. ESTIMASI BIAYA bila relevan
+I. PERTANYAAN LANJUTAN bila benar-benar diperlukan
 
-Jawab dalam Bahasa Indonesia yang jelas, teknis tetapi tetap mudah dipahami pemilik kendaraan.`;
+Gunakan Bahasa Indonesia yang natural, tegas, teknis, dan mudah dipahami. Jangan memberi jawaban generik. Hubungkan analisis dengan kendaraan dan riwayat yang diberikan.`;
 }
 function openExpertModal(){
  if(state.plan!=='pro'){toast('Fitur Automotive Expert tersedia untuk PRO.');return}
@@ -138,7 +143,7 @@ function openExpertModal(){
  const m=modal(`<div class="row between"><div><h3 style="margin:0">💎 Automotive Expert</h3><div class="small muted">Universal Expert Prompt Engine</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="pro card" style="margin-top:12px"><strong>Tanya apa saja tentang kendaraan ini.</strong><div class="small" style="margin-top:5px;opacity:.9">Diagnosis · modifikasi · racing · styling · spare part · performa · risiko · maintenance</div></div>
  <div class="field" style="margin-top:12px"><label>Pertanyaan Anda</label><textarea id="expertQ" style="min-height:130px" placeholder="Contoh: Saya mau membuat PCX saya lebih ceper untuk gaya. Apa dampaknya terhadap handling, kenyamanan, komponen dan keselamatan?"></textarea></div>
- <div class="small muted">Aplikasi hanya membuat prompt. Tidak ada API AI berbayar yang dipanggil oleh Vehicle Lifebook.</div>
+ <div class="small muted">Gunakan prompt ini di AI pilihan Anda untuk mendapatkan analisis otomotif mendalam berdasarkan kendaraan dan riwayatnya.</div>
  <button class="btn primary" style="width:100%;margin-top:12px" id="makePrompt">⚡ Buat Expert Prompt</button>
  <div id="expertResult" style="margin-top:12px"></div>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
@@ -206,7 +211,7 @@ function renderAuth(){
    <div class="video-overlay">
      <span class="video-badge">Vehicle Lifebook</span>
      <h1 style="font-size:clamp(28px,5vw,48px);line-height:1.05;margin:10px 0 6px">Know your vehicle.<br>Keep its story.</h1>
-     <div style="color:#cbd5e1;font-size:12px;max-width:500px">Digital vehicle history, intelligent records, and a professional Automotive Expert prompt engine.</div>
+     <div style="color:#cbd5e1;font-size:12px;max-width:500px">A complete digital record for every vehicle you own.</div>
    </div>
  </section>
  <section class="landing-auth">
@@ -221,7 +226,7 @@ function renderAuth(){
    <div class="feature-line"><span>✓</span><div><b>Complete Vehicle History</b>Servis, BBM, kerusakan, part, inspeksi & biaya.</div></div>
    <div class="feature-line"><span>✓</span><div><b>Voice-first recording</b>Catat aktivitas kendaraan secara natural.</div></div>
    <div class="feature-line"><span>◆</span><div><b>PRO Automotive Expert</b>Buat prompt expert dari konteks kendaraan Anda.</div></div>
-   <p class="small muted" style="margin-top:18px">Video welcome dapat diganti kapan saja dengan mengunggah <b>assets/welcome.mp4</b> ke repository GitHub.</p>
+
  </section>
  </div></main>`;
  $('#login').onclick=()=>auth('login');$('#signup').onclick=()=>auth('signup');$('#reset').onclick=resetPassword;
