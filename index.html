@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -143,9 +143,16 @@ async function exportXlsx(){
  const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
  ws['!cols']=[{wch:14},{wch:14},{wch:34},{wch:18},{wch:16},{wch:60},{wch:14}];
  ws['!freeze']={xSplit:0,ySplit:1}; ws['!autofilter']={ref:XLSX.utils.encode_range(ws['!ref'])};
+ const range=XLSX.utils.decode_range(ws['!ref']);
+ const border={top:{style:'thin',color:{rgb:'D9E1EA'}},bottom:{style:'thin',color:{rgb:'D9E1EA'}},left:{style:'thin',color:{rgb:'D9E1EA'}},right:{style:'thin',color:{rgb:'D9E1EA'}}};
+ for(let C=range.s.c;C<=range.e.c;C++){const cell=ws[XLSX.utils.encode_cell({r:0,c:C})];if(cell)cell.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1E3A8A'}},alignment:{vertical:'center',horizontal:'center',wrapText:true},border};}
+ for(let R=1;R<=range.e.r;R++)for(let C=range.s.c;C<=range.e.c;C++){const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];if(cell)cell.s={border,alignment:{vertical:'top',wrapText:true}};}
  XLSX.utils.book_append_sheet(wb,ws,'Timeline');
  const info=XLSX.utils.json_to_sheet([{Field:'Kendaraan',Value:[v?.brand,v?.model,v?.year].filter(Boolean).join(' ')},{Field:'Plat',Value:v?.plate_number||''},{Field:'Odometer',Value:v?.current_odometer??''}]);
- info['!cols']=[{wch:20},{wch:45}];XLSX.utils.book_append_sheet(wb,info,'Vehicle');
+ info['!cols']=[{wch:20},{wch:45}];
+ const ir=XLSX.utils.decode_range(info['!ref']);for(let C=ir.s.c;C<=ir.e.c;C++){const cell=info[XLSX.utils.encode_cell({r:0,c:C})];if(cell)cell.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0F172A'}},border,alignment:{vertical:'center'}};}
+ for(let R=1;R<=ir.e.r;R++)for(let C=ir.s.c;C<=ir.e.c;C++){const cell=info[XLSX.utils.encode_cell({r:R,c:C})];if(cell)cell.s={border,alignment:{vertical:'top',wrapText:true}};}
+ XLSX.utils.book_append_sheet(wb,info,'Vehicle');
  XLSX.writeFile(wb,`vehicle-lifebook-${(v?.plate_number||'vehicle').replace(/\\s+/g,'-')}.xlsx`);
  toast('Excel XLSX selesai');
 }
