@@ -27,7 +27,7 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 .tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px}.tab{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:600}.tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
 .vehicle{display:flex;justify-content:space-between;gap:12px;align-items:center}.plate{font-size:20px;font-weight:700;letter-spacing:.5px}.event{border-left:4px solid #93c5fd}.event .type{font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase}.cost{font-weight:700}.empty{text-align:center;padding:30px 14px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,120px);opacity:0;transition:.25s;z-index:100;max-width:calc(100vw - 30px);padding:12px 15px;border-radius:12px;background:#0f172a;color:#fff;box-shadow:var(--shadow);font-size:13px}.toast.show{transform:translate(-50%,0);opacity:1}
-.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:80;display:grid;place-items:end center;padding:10px}.sheet{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;padding:18px}.voice{border:2px dashed #bfdbfe;background:#eff6ff;padding:14px;border-radius:16px}.voiceMic{border:0;background:#0f172a;color:#fff;border-radius:10px;padding:7px 10px;font-weight:700;cursor:pointer;font-size:12px}.voiceMic.listening{background:#dc2626}.fieldHead{display:flex;align-items:center;justify-content:space-between;gap:8px}.fieldHead label{margin:0}.voiceHint{font-size:11px;color:#64748b;margin-top:3px}.pulse{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.5}}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:80;display:grid;place-items:end center;padding:10px}.sheet{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;padding:18px}.voice{border:2px dashed #bfdbfe;background:#eff6ff;padding:14px;border-radius:16px}.pulse{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.5}}
 .badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:700;background:#f1f5f9}.success{color:#047857;background:#d1fae5}.warning{color:#92400e;background:#fef3c7}
 .pro{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:0}
 .promptbox{background:#0b1220;color:#e2e8f0;border-radius:16px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:48vh;overflow:auto}
@@ -143,12 +143,11 @@ function openExpertModal(){
  const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
  const m=modal(`<div class="row between"><div><h3 style="margin:0">💎 Automotive Expert</h3><div class="small muted">Universal Expert Prompt Engine</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="pro card" style="margin-top:12px"><strong>Tanya apa saja tentang kendaraan ini.</strong><div class="small" style="margin-top:5px;opacity:.9">Diagnosis · modifikasi · racing · styling · spare part · performa · risiko · maintenance</div></div>
- <div class="field" style="margin-top:12px"><div class="fieldHead"><label>Pertanyaan Anda</label>${voiceButton("expertQ")}</div><textarea id="expertQ" style="min-height:130px" placeholder="Ketuk Voice lalu bicara. Bisa juga ketik manual."></textarea></div>
+ <div class="field" style="margin-top:12px"><label>Pertanyaan Anda</label><textarea id="expertQ" style="min-height:130px" placeholder="Contoh: Saya mau membuat PCX saya lebih ceper untuk gaya. Apa dampaknya terhadap handling, kenyamanan, komponen dan keselamatan?"></textarea></div>
  <div class="small muted">Gunakan prompt ini di AI pilihan Anda untuk mendapatkan analisis otomotif mendalam berdasarkan kendaraan dan riwayatnya.</div>
  <button class="btn primary" style="width:100%;margin-top:12px" id="makePrompt">⚡ Buat Expert Prompt</button>
  <div id="expertResult" style="margin-top:12px"></div>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
- attachVoice(m,'expertQ');
  m.querySelector('#makePrompt').onclick=()=>{
    const q=m.querySelector('#expertQ').value.trim();if(!q){toast('Tulis pertanyaan dulu');return}
    const p=buildExpertPrompt(q,v);
@@ -299,15 +298,14 @@ function modal(inner){
 }
 function closeModal(m){m?.remove()}
 
-function attachVoice(root,targetId,onText){const b=root.querySelector('[data-voice-target="'+targetId+'"]');if(!b)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){b.disabled=true;return}let rec=null;b.onclick=()=>{if(rec){try{rec.stop()}catch{};return}rec=new SR();rec.lang="id-ID";rec.interimResults=false;rec.continuous=false;b.classList.add("listening");b.textContent="⏺ Mendengar";rec.onresult=e=>{const s=e.results[0]?.[0]?.transcript||"";const el=root.querySelector("#"+targetId);if(el){el.value=s;el.dispatchEvent(new Event("input",{bubbles:true}))}if(onText)onText(s)};rec.onerror=e=>toast("Voice: "+e.error);rec.onend=()=>{b.classList.remove("listening");b.textContent="🎙️ Voice";rec=null};try{rec.start()}catch{}}}function voiceButton(targetId){return '<button type="button" class="voiceMic" data-voice-target="'+targetId+'">🎙️ Voice</button>'}function parseVehicleVoice(s,m){const t=s.toLowerCase(),set=(id,v)=>{const el=m.querySelector("#"+id);if(el&&v!=null)el.value=v};const plate=s.match(/(?:plat|nomor|nopol|nopolisi)\s+([a-z0-9\s-]{3,12})/i);if(plate)set("vPlate",plate[1].trim().toUpperCase());const year=t.match(/tahun\s+(20\d{2})/);if(year)set("vYear",year[1]);const br=["honda","yamaha","toyota","suzuki","kawasaki","bmw","mitsubishi","daihatsu","nissan","mazda","hyundai","kia","ford","wuling"].find(x=>t.includes(x));if(br)set("vBrand",br.toUpperCase());const co=["merah","hitam","putih","biru","abu-abu","silver","kuning","hijau","coklat","oranye","orange"].find(x=>t.includes(x));if(co)set("vColor",co);const mo=["pcx 160","pcx","nmax","aerox","vario 160","vario 150","beat","scoopy","xmax","avanza","innova","fortuner","pajero","brio","civic","city"].find(x=>t.includes(x));if(mo)set("vModel",mo.toUpperCase());set("vNotes",s)}function parseEventVoice(s,m){const p=parseVoice(s),set=(id,v)=>{const el=m.querySelector("#"+id);if(el&&v!=null)el.value=v};set("eType",p.type);set("eDate",p.date);set("eTitle",p.title);set("eCost",p.cost||"");set("eDesc",p.description)}function openVehicleModal(){
+function openVehicleModal(){
  if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas DEMO tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
  const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div>
- <div class="field"><div class="fieldHead"><label>🎙️ Isi kendaraan dengan suara</label>${voiceButton("vNotes")}</div><div class="voiceHint">Contoh: "Plat B 1234 ABC, Honda PCX 160 tahun 2022 warna merah"</div><textarea id="vNotes" placeholder="Ucapkan data kendaraan..."></textarea></div>
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
  <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
- <div class="field"><label>Catatan</label><textarea id="vNotes2"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
- m.querySelector('[data-close]').onclick=()=>closeModal(m);attachVoice(m,'vNotes',s=>parseVehicleVoice(s,m));
+ <div class="field"><label>Catatan</label><textarea id="vNotes"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
  m.querySelector('#saveVehicle').onclick=async()=>{
   const plate=m.querySelector('#vPlate').value.trim().toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
   setBusy(true);try{
@@ -326,10 +324,10 @@ function openEventModal(prefill={}){
  <div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eDate" type="date" value="${esc(prefill.date||today())}"></div></div>
  <div class="field"><label>Judul *</label><input id="eTitle" value="${esc(prefill.title||'')}" placeholder="Contoh: Ganti oli + filter oli"></div>
  <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eCost" type="number" min="0" value="${prefill.cost??''}"></div><div class="field"><label>Odometer (km)</label><input id="eOdo" type="number" min="0" value="${prefill.odometer??''}"></div></div>
- <div class="field"><div class="fieldHead"><label>Deskripsi</label>${voiceButton("eDesc")}</div><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea></div>
+ <div class="field"><label>Deskripsi</label><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea></div>
  <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
  <button class="btn primary" style="width:100%" id="saveEvent">Simpan aktivitas</button>`);
- m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);attachVoice(m,'eDesc',s=>parseEventVoice(s,m));
+ m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);
  m.querySelector('#saveEvent').onclick=async()=>{
   const title=m.querySelector('#eTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}
   const cost=Number(m.querySelector('#eCost').value||0),odo=m.querySelector('#eOdo').value===''?null:Number(m.querySelector('#eOdo').value);
@@ -341,20 +339,9 @@ function openEventModal(prefill={}){
  };
 }
 
-function parseIndoNumberWords(s){
- const w={nol:0,satu:1,sebuah:1,dua:2,tiga:3,empat:4,lima:5,enam:6,tujuh:7,delapan:8,sembilan:9,sepuluh:10,sebelas:11};
- const t=String(s).toLowerCase().replace(/[^a-z\s-]/g,' ').replace(/-/g,' ').trim();if(!t)return null;
- const a=t.split(/\s+/);let total=0,cur=0,found=false;
- for(let i=0;i<a.length;i++){const x=a[i];if(w[x]!=null){cur+=w[x];found=true}else if(x==='belas'){cur=(cur||1)+10;found=true}else if(x==='puluh'){cur=(cur||1)*10;found=true}else if(x==='ratus'){cur=(cur||1)*100;found=true}else if(x==='ribu'){total+=(cur||1)*1000;cur=0;found=true}else if(x==='juta'){total+=(cur||1)*1000000;cur=0;found=true}}
- return found?total+cur:null;
-}
 function parseMoney(s){
- const raw=String(s).toLowerCase();
- const m=raw.replace(/\./g,'').replace(/,/g,'').match(/(\d[\d\s]*)\s*(juta|jt|ribu|rb|k|rupiah|rp)?/);
- if(m){let n=Number(m[1].replace(/\s/g,''));const u=m[2]||'';if(u==='juta'||u==='jt')n*=1e6;else if(['ribu','rb','k'].includes(u))n*=1e3;return n}
- const wm=raw.match(/([a-z\s-]+?)(?=\s*(?:rupiah|rp|juta|jt|ribu|rb)\b|$)/);
- const n=parseIndoNumberWords(wm?wm[1]:raw);if(n!=null)return n;
- return null;
+ const m=String(s).toLowerCase().replace(/\./g,'').replace(/,/g,'').match(/(\d[\d\s]*)\s*(juta|jt|ribu|rb|k|rupiah|rp)?/);
+ if(!m)return null;let n=Number(m[1].replace(/\s/g,''));const u=m[2]||'';if(['juta'].includes(u))n*=1e6;else if(['jt'].includes(u))n*=1e6;else if(['ribu','rb','k'].includes(u))n*=1e3;return n;
 }
 function parseVoice(text){
  const t=text.toLowerCase().trim(), out={source:'voice',raw_input:text,date:today(),type:'note',title:text,description:text,cost:0};
