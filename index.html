@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="description" content="Vehicle Lifebook — riwayat hidup kendaraan berbasis Supabase">
+<title>Vehicle Lifebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--shadow:0 10px 30px rgba(15,23,42,.07);--r:18px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Poppins,system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}
+.hidden{display:none!important}.app{min-height:100vh}.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.topin{max-width:1100px;margin:auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}.brand{font-weight:700;font-size:18px}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500}.wrap{max-width:1100px;margin:auto;padding:18px 16px 90px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}.hero{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;border:0}.hero .muted{color:#cbd5e1}
+.kpi{font-size:24px;font-weight:700}.muted{color:var(--muted)}.small{font-size:12px}.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.wraprow{flex-wrap:wrap}
+.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:600}.btn.primary{background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary2)}.btn.ghost{background:#eef2ff;color:#1e40af}.btn.danger{background:#fee2e2;color:#991b1b}.btn.gray{background:#f1f5f9;color:#334155}.btn:disabled{opacity:.55;cursor:not-allowed}
+input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 12px;outline:none}input:focus,select:focus,textarea:focus{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe}textarea{min-height:90px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.auth{max-width:430px;margin:9vh auto;padding:16px}.auth .card{padding:22px}.logo{width:48px;height:48px;border-radius:14px;background:#dbeafe;color:#1d4ed8;display:grid;place-items:center;font-size:24px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px}.tab{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:600}.tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+.vehicle{display:flex;justify-content:space-between;gap:12px;align-items:center}.plate{font-size:20px;font-weight:700;letter-spacing:.5px}.event{border-left:4px solid #93c5fd}.event .type{font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase}.cost{font-weight:700}.empty{text-align:center;padding:30px 14px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,120px);opacity:0;transition:.25s;z-index:100;max-width:calc(100vw - 30px);padding:12px 15px;border-radius:12px;background:#0f172a;color:#fff;box-shadow:var(--shadow);font-size:13px}.toast.show{transform:translate(-50%,0);opacity:1}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:80;display:grid;place-items:end center;padding:10px}.sheet{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;padding:18px}.voice{border:2px dashed #bfdbfe;background:#eff6ff;padding:14px;border-radius:16px}.pulse{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.5}}
+.badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:700;background:#f1f5f9}.success{color:#047857;background:#d1fae5}.warning{color:#92400e;background:#fef3c7}
+@media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr}.wrap{padding-left:12px;padding-right:12px}.topin{padding-left:12px;padding-right:12px}.hero{padding:15px}}
+@media(max-width:470px){.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.plate{font-size:18px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+
+const APP_KEY='vehicle-lifebook-config-v1';
+const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,config:null};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const rupiah=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n)||0);
+const today=()=>new Date().toISOString().slice(0,10);
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.remove('show'),2800)}
+function saveConfig(c){localStorage.setItem(APP_KEY,JSON.stringify(c))}
+function loadConfig(){try{return JSON.parse(localStorage.getItem(APP_KEY)||'null')}catch{return null}}
+function validUrl(s){try{const u=new URL(s);return u.protocol==='https:'&&u.hostname.endsWith('supabase.co')}catch{return false}}
+function setBusy(v){state.busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v)}
+
+async function boot(){
+  state.config=loadConfig();
+  if(!state.config){renderSetup();return}
+  if(!validUrl(state.config.url)||!state.config.key){renderSetup('Konfigurasi belum valid.');return}
+  try{
+    state.sb=window.supabase.createClient(state.config.url,state.config.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    const {data:{session}}=await state.sb.auth.getSession();
+    if(session?.user){state.user=session.user;await afterLogin()} else renderAuth();
+    state.sb.auth.onAuthStateChange(async(_e,session)=>{state.user=session?.user||null;if(state.user) await afterLogin(); else renderAuth()});
+  }catch(e){renderSetup('Gagal menginisialisasi Supabase: '+e.message)}
+}
+
+function renderSetup(msg=''){
+ $('#app').innerHTML=`<main class="auth"><div class="card"><div class="logo">🚗</div><h1>Vehicle Lifebook</h1><p class="muted">Setup koneksi Supabase. Public/publishable key saja — jangan masukkan service_role.</p>${msg?'<div class="card" style="background:#fff7ed;border-color:#fed7aa;margin-bottom:12px">'+esc(msg)+'</div>':''}
+ <div class="field"><label>Project URL</label><input id="cfgUrl" placeholder="https://xxxxx.supabase.co" value="${esc(state.config?.url||'')}"></div>
+ <div class="field"><label>Publishable / anon key</label><textarea id="cfgKey" style="min-height:80px" placeholder="eyJ..."></textarea></div>
+ <button class="btn primary" style="width:100%" id="saveCfg">Simpan & Hubungkan</button>
+ <p class="small muted" style="margin-top:12px">Key disimpan hanya di perangkat ini (localStorage).</p></div></main>`;
+ $('#saveCfg').onclick=async()=>{
+   const url=$('#cfgUrl').value.trim(),key=$('#cfgKey').value.trim();
+   if(!validUrl(url)||!key){toast('URL atau key belum valid');return}
+   saveConfig({url,key});state.config={url,key};location.reload();
+ };
+}
+
+function renderAuth(){
+ $('#app').innerHTML=`<main class="auth"><div class="card"><div class="logo">🚗</div><h1>Vehicle Lifebook</h1><p class="muted">Masuk untuk membuka data kendaraan Anda.</p>
+ <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="nama@email.com"></div>
+ <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Minimal 6 karakter"></div>
+ <div class="row"><button class="btn primary" id="login">Masuk</button><button class="btn ghost" id="signup">Daftar</button></div>
+ <button class="btn gray" id="reset" style="margin-top:10px;width:100%">Kirim link reset password</button>
+ <p class="small muted" style="margin-top:14px">Data kendaraan dipisahkan berdasarkan akun Supabase.</p></div></main>`;
+ $('#login').onclick=()=>auth('login');$('#signup').onclick=()=>auth('signup');$('#reset').onclick=resetPassword;
+}
+async function auth(mode){
+ const email=$('#email').value.trim(),password=$('#password').value;
+ if(!email||!password){toast('Email dan password wajib diisi');return}
+ setBusy(true);
+ try{
+  const r=mode==='login'?await state.sb.auth.signInWithPassword({email,password}):await state.sb.auth.signUp({email,password});
+  if(r.error)throw r.error;
+  toast(mode==='login'?'Berhasil masuk.':'Akun dibuat. Jika email confirmation aktif, cek email Anda.');
+  if(mode==='signup'&&!r.data.session)toast('Cek email untuk konfirmasi akun.');
+ }catch(e){toast(e.message||'Autentikasi gagal')}finally{setBusy(false)}
+}
+async function resetPassword(){
+ const email=$('#email').value.trim();if(!email){toast('Isi email dulu');return}
+ const {error}=await state.sb.auth.resetPasswordForEmail(email,{redirectTo:location.href});
+ toast(error?error.message:'Link reset dikirim jika email terdaftar.');
+}
+
+async function afterLogin(){await loadVehicles();renderApp()}
+async function loadVehicles(){
+ const {data,error}=await state.sb.from('vehicles').select('*').order('plate_number');
+ if(error){toast(error.message);return}state.vehicles=data||[];
+ if(!state.selected&&state.vehicles[0])state.selected=state.vehicles[0].id;
+ if(state.selected&&!state.vehicles.some(v=>v.id===state.selected))state.selected=state.vehicles[0]?.id||null;
+ if(state.selected)await loadEvents();
+}
+async function loadEvents(){
+ const {data,error}=await state.sb.from('vehicle_timeline').select('*').eq('vehicle_id',state.selected).order('event_date',{ascending:false}).order('created_at',{ascending:false});
+ if(error){toast(error.message);return}state.events=data||[];
+}
+
+function renderApp(){
+ const v=state.vehicles.find(x=>x.id===state.selected);
+ $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>Digital vehicle history</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
+ <main class="wrap">
+ <section class="hero card"><div class="row between wraprow"><div><div class="small muted">LIFEBOOK</div><h2 style="margin:3px 0 0">Riwayat Kendaraan</h2><div class="small muted">Catat sekali, cari kapan saja.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
+ <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="exportBtn">Export</button><button class="tab" id="configBtn">Koneksi</button></div>
+ <div class="grid">
+   <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
+   <div class="card"><div class="small muted">Aktivitas</div><div class="kpi">${state.events.length}</div></div>
+   <div class="card"><div class="small muted">Biaya terlihat</div><div class="kpi" style="font-size:18px">${rupiah(state.events.reduce((a,e)=>a+Number(e.total_cost||0),0))}</div></div>
+ </div>
+ <section style="margin-top:12px" class="card"><div class="row between"><h3 style="margin:0">Kendaraan</h3><button class="btn ghost" id="voiceBtn">🎙️ Input suara</button></div>
+ <div style="margin-top:10px">${state.vehicles.length?state.vehicles.map(x=>`<button class="card vehicle" data-vehicle="${x.id}" style="width:100%;text-align:left;margin-bottom:8px;box-shadow:none"><div><div class="plate">${esc(x.plate_number)}</div><div class="small muted">${esc([x.brand,x.model,x.year].filter(Boolean).join(' · ')||'Profil belum lengkap')}</div></div><span class="badge ${x.id===state.selected?'success':''}">${x.id===state.selected?'AKTIF':'PILIH'}</span></button>`).join(''):'<div class="empty">Belum ada kendaraan.<br>Tambahkan kendaraan pertama.</div>'}</div></section>
+ ${v?vehicleSection(v):''}
+ </main></div>`;
+ $('#logout').onclick=()=>state.sb.auth.signOut();$('#addVehicle').onclick=()=>openVehicleModal();
+ $('#voiceBtn').onclick=()=>openVoiceModal();$('#exportBtn').onclick=exportExcel;$('#configBtn').onclick=()=>renderSetup('Anda dapat mengganti koneksi Supabase di sini.');
+ document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
+}
+function vehicleSection(v){
+ const total=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
+ return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><button class="btn primary" id="addEvent">+ Aktivitas</button></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
+ <div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Timeline</h3><input id="eventSearch" style="max-width:220px" placeholder="Cari aktivitas..."></div><div id="timeline" style="margin-top:12px">${timelineHtml(state.events)}</div></div></section>`;
+}
+function timelineHtml(events){
+ if(!events.length)return '<div class="empty">Belum ada aktivitas untuk kendaraan ini.</div>';
+ return events.map(e=>`<article class="card event" style="margin-bottom:9px;box-shadow:none"><div class="row between"><div><div class="type">${esc(e.event_type)}</div><strong>${esc(e.title)}</strong></div><span class="cost">${rupiah(e.total_cost)}</span></div><div class="small muted" style="margin-top:6px">${esc(e.event_date)} ${e.odometer!=null?' · '+Number(e.odometer).toLocaleString('id-ID')+' km':''}</div>${e.description?'<div style="margin-top:7px">'+esc(e.description)+'</div>':''}${e.raw_input?'<div class="small muted" style="margin-top:7px">Voice: '+esc(e.raw_input)+'</div>':''}</article>`).join('');
+}
+
+function modal(inner){
+ const m=document.createElement('div');m.className='modal';m.innerHTML='<div class="sheet">'+inner+'</div>';document.body.appendChild(m);m.onclick=e=>{if(e.target===m)m.remove()};return m;
+}
+function closeModal(m){m?.remove()}
+
+function openVehicleModal(){
+ const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div>
+ <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
+ <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
+ <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
+ <div class="field"><label>Catatan</label><textarea id="vNotes"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#saveVehicle').onclick=async()=>{
+  const plate=m.querySelector('#vPlate').value.trim().toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
+  setBusy(true);try{
+   const {data,error}=await state.sb.from('vehicles').insert({owner_id:state.user.id,plate_number:plate,year:Number(m.querySelector('#vYear').value)||null,brand:m.querySelector('#vBrand').value.trim()||null,model:m.querySelector('#vModel').value.trim()||null,variant:m.querySelector('#vVariant').value.trim()||null,color:m.querySelector('#vColor').value.trim()||null,notes:m.querySelector('#vNotes').value.trim()||null}).select().single();
+   if(error)throw error;state.selected=data.id;closeModal(m);await loadVehicles();renderApp();toast('Kendaraan tersimpan');
+  }catch(e){toast(e.message)}finally{setBusy(false)}
+ };
+}
+
+function openEventModal(prefill={}){
+ const v=state.vehicles.find(x=>x.id===state.selected);
+ if(!v){toast('Tambahkan kendaraan dulu');return}
+ const m=modal(`<div class="row between"><h3>Tambah aktivitas</h3><button class="btn gray" data-close>✕</button></div>
+ <div class="badge success">${esc(v.plate_number)}</div>
+ <div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eDate" type="date" value="${esc(prefill.date||today())}"></div></div>
+ <div class="field"><label>Judul *</label><input id="eTitle" value="${esc(prefill.title||'')}" placeholder="Contoh: Ganti oli + filter oli"></div>
+ <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eCost" type="number" min="0" value="${prefill.cost??''}"></div><div class="field"><label>Odometer (km)</label><input id="eOdo" type="number" min="0" value="${prefill.odometer??''}"></div></div>
+ <div class="field"><label>Deskripsi</label><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea></div>
+ <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
+ <button class="btn primary" style="width:100%" id="saveEvent">Simpan aktivitas</button>`);
+ m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#saveEvent').onclick=async()=>{
+  const title=m.querySelector('#eTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}
+  const cost=Number(m.querySelector('#eCost').value||0),odo=m.querySelector('#eOdo').value===''?null:Number(m.querySelector('#eOdo').value);
+  if(cost<0||(odo!=null&&odo<0)){toast('Nilai biaya/odometer tidak valid');return}
+  setBusy(true);try{
+   const {data,error}=await state.sb.rpc('create_vehicle_event',{p_vehicle_id:state.selected,p_event_type:m.querySelector('#eType').value,p_event_date:m.querySelector('#eDate').value,p_title:title,p_description:m.querySelector('#eDesc').value.trim()||null,p_total_cost:cost,p_odometer:odo,p_source:prefill.source||'manual',p_raw_input:prefill.raw_input||null,p_metadata:{},p_detail:{}});
+   if(error)throw error;closeModal(m);await loadVehicles();renderApp();toast('Aktivitas tersimpan');
+  }catch(e){toast(e.message||'Gagal menyimpan aktivitas')}finally{setBusy(false)}
+ };
+}
+
+function parseMoney(s){
+ const m=String(s).toLowerCase().replace(/\./g,'').replace(/,/g,'').match(/(\d[\d\s]*)\s*(juta|jt|ribu|rb|k|rupiah|rp)?/);
+ if(!m)return null;let n=Number(m[1].replace(/\s/g,''));const u=m[2]||'';if(['juta'].includes(u))n*=1e6;else if(['jt'].includes(u))n*=1e6;else if(['ribu','rb','k'].includes(u))n*=1e3;return n;
+}
+function parseVoice(text){
+ const t=text.toLowerCase().trim(), out={source:'voice',raw_input:text,date:today(),type:'note',title:text,description:text,cost:0};
+ if(/bensin|solar|bbm|pertalite|pertamax|dexlite|shell/.test(t)){out.type='fuel';out.title='Isi BBM';}
+ else if(/servis|service|ganti oli|oli|filter|kampas rem|tune up/.test(t)){out.type='service';out.title='Servis kendaraan';}
+ else if(/rusak|kerusakan|pecah|bocor|retak|mogok/.test(t)){out.type='damage';out.title='Kerusakan kendaraan';}
+ else if(/spare part|suku cadang|part/.test(t)){out.type='part';out.title='Spare part';}
+ else if(/inspeksi|inspection|cek kendaraan|pemeriksaan/.test(t)){out.type='inspection';out.title='Inspeksi kendaraan';}
+ else if(/bayar|biaya|pengeluaran|parkir|tol/.test(t)){out.type='expense';out.title='Pengeluaran kendaraan';}
+ const money=parseMoney(t);if(money!=null)out.cost=money;
+ const d=t.match(/(?:tanggal|tgl)\s+(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)(?:\s+(\d{4}))?/);
+ if(d){const months=['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'];out.date=(d[3]||new Date().getFullYear())+'-'+String(months.indexOf(d[2])+1).padStart(2,'0')+'-'+String(d[1]).padStart(2,'0')}
+ if(/kemarin/.test(t)){const x=new Date();x.setDate(x.getDate()-1);out.date=x.toISOString().slice(0,10)}
+ if(/sabtu|minggu|senin|selasa|rabu|kamis|jumat/.test(t)&&!d&&!/kemarin/.test(t)){/* weekday is contextual; do not guess a date */}
+ out.description=text;
+ return out;
+}
+function openVoiceModal(){
+ const m=modal(`<div class="row between"><h3>🎙️ Input suara</h3><button class="btn gray" data-close>✕</button></div>
+ <div class="voice"><div class="small muted">Contoh</div><strong>“Hari ini servis ganti oli habis 350 ribu.”</strong><div class="small muted" style="margin-top:6px">Voice → transkrip → ekstraksi → preview → konfirmasi. Tidak langsung disimpan.</div></div>
+ <div class="row" style="margin-top:12px"><button class="btn primary" id="startVoice">🎙️ Mulai bicara</button><span id="voiceStatus" class="small muted">Siap.</span></div>
+ <div class="field" style="margin-top:12px"><label>Transkrip / teks</label><textarea id="voiceText" placeholder="Atau ketik kalimat secara manual..."></textarea></div>
+ <button class="btn ghost" style="width:100%" id="parseVoice">Analisis & Preview</button>
+ <div id="voicePreview" style="margin-top:12px"></div>`);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){m.querySelector('#startVoice').disabled=true;m.querySelector('#voiceStatus').textContent='Browser ini tidak mendukung Speech Recognition. Gunakan teks.'}
+ else{
+  const r=new SR();r.lang='id-ID';r.interimResults=true;r.continuous=false;
+  r.onstart=()=>{m.querySelector('#voiceStatus').textContent='Mendengarkan…';m.querySelector('#startVoice').classList.add('pulse')};
+  r.onend=()=>{m.querySelector('#voiceStatus').textContent='Selesai.';m.querySelector('#startVoice').classList.remove('pulse')};
+  r.onerror=e=>m.querySelector('#voiceStatus').textContent='Voice error: '+e.error;
+  r.onresult=e=>{let s='';for(let i=e.resultIndex;i<e.results.length;i++)s+=e.results[i][0].transcript;m.querySelector('#voiceText').value=s};
+  m.querySelector('#startVoice').onclick=()=>{try{r.start()}catch{}};
+ }
+ m.querySelector('#parseVoice').onclick=()=>{
+  const text=m.querySelector('#voiceText').value.trim();if(!text){toast('Belum ada suara/teks');return}
+  const p=parseVoice(text);m.querySelector('#voicePreview').innerHTML=`<div class="card" style="box-shadow:none;background:#f8fafc"><div class="row between"><strong>Preview</strong><span class="badge warning">Belum disimpan</span></div><div class="two" style="margin-top:10px"><div><div class="small muted">Jenis</div><strong>${esc(p.type)}</strong></div><div><div class="small muted">Tanggal</div><strong>${esc(p.date)}</strong></div><div><div class="small muted">Judul</div><strong>${esc(p.title)}</strong></div><div><div class="small muted">Biaya</div><strong>${rupiah(p.cost)}</strong></div></div><div style="margin-top:10px" class="small">${esc(p.description)}</div><button class="btn primary" style="width:100%;margin-top:12px" id="confirmVoice">Konfirmasi & simpan</button></div>`;
+  m.querySelector('#confirmVoice').onclick=()=>{closeModal(m);openEventModal(p)};
+ };
+}
+
+async function exportExcel(){
+ if(!state.events.length){toast('Belum ada data untuk diekspor');return}
+ const rows=state.events.map(e=>({Tanggal:e.event_date,Jenis:e.event_type,Judul:e.title,Biaya:Number(e.total_cost||0),Odometer:e.odometer??'',Deskripsi:e.description||'',Sumber:e.source}));
+ const csv=[Object.keys(rows[0]).join(','),...rows.map(r=>Object.values(r).map(v=>'"'+String(v).replaceAll('"','""')+'"').join(','))].join('\n');
+ const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vehicle-lifebook.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Export CSV selesai — bisa dibuka di Excel.');
+}
+
+document.addEventListener('input',e=>{
+ if(e.target.id==='eventSearch'){const q=e.target.value.toLowerCase();const filtered=state.events.filter(x=>(x.title+' '+x.description+' '+x.event_type).toLowerCase().includes(q));$('#timeline').innerHTML=timelineHtml(filtered)}
+});
+boot();
+</script>
+</body>
+</html>
