@@ -37,8 +37,11 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 <script>
 'use strict';
 
-const APP_KEY='vehicle-lifebook-config-v1';
-const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,config:null};
+// Vehicle Lifebook — production Supabase configuration.
+// Publishable/anon key is intentionally public. NEVER put service_role/secret keys here.
+const SUPABASE_URL='https://oeuyhfuohaizwuljgzeg.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
+const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null};
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -51,28 +54,20 @@ function validUrl(s){try{const u=new URL(s);return u.protocol==='https:'&&u.host
 function setBusy(v){state.busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v)}
 
 async function boot(){
-  state.config=loadConfig();
-  if(!state.config){renderSetup();return}
-  if(!validUrl(state.config.url)||!state.config.key){renderSetup('Konfigurasi belum valid.');return}
   try{
-    state.sb=window.supabase.createClient(state.config.url,state.config.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    state.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     const {data:{session}}=await state.sb.auth.getSession();
     if(session?.user){state.user=session.user;await afterLogin()} else renderAuth();
-    state.sb.auth.onAuthStateChange(async(_e,session)=>{state.user=session?.user||null;if(state.user) await afterLogin(); else renderAuth()});
-  }catch(e){renderSetup('Gagal menginisialisasi Supabase: '+e.message)}
+    state.sb.auth.onAuthStateChange(async(_e,session)=>{
+      state.user=session?.user||null;
+      if(state.user) await afterLogin(); else renderAuth();
+    });
+  }catch(e){renderAuth();toast('Gagal menginisialisasi aplikasi: '+e.message)}
 }
 
 function renderSetup(msg=''){
- $('#app').innerHTML=`<main class="auth"><div class="card"><div class="logo">🚗</div><h1>Vehicle Lifebook</h1><p class="muted">Setup koneksi Supabase. Public/publishable key saja — jangan masukkan service_role.</p>${msg?'<div class="card" style="background:#fff7ed;border-color:#fed7aa;margin-bottom:12px">'+esc(msg)+'</div>':''}
- <div class="field"><label>Project URL</label><input id="cfgUrl" placeholder="https://xxxxx.supabase.co" value="${esc(state.config?.url||'')}"></div>
- <div class="field"><label>Publishable / anon key</label><textarea id="cfgKey" style="min-height:80px" placeholder="eyJ..."></textarea></div>
- <button class="btn primary" style="width:100%" id="saveCfg">Simpan & Hubungkan</button>
- <p class="small muted" style="margin-top:12px">Key disimpan hanya di perangkat ini (localStorage).</p></div></main>`;
- $('#saveCfg').onclick=async()=>{
-   const url=$('#cfgUrl').value.trim(),key=$('#cfgKey').value.trim();
-   if(!validUrl(url)||!key){toast('URL atau key belum valid');return}
-   saveConfig({url,key});state.config={url,key};location.reload();
- };
+  // Setup screen removed in production. Supabase configuration is bundled in the app.
+  renderAuth();
 }
 
 function renderAuth(){
@@ -119,7 +114,7 @@ function renderApp(){
  $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>Digital vehicle history</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
  <main class="wrap">
  <section class="hero card"><div class="row between wraprow"><div><div class="small muted">LIFEBOOK</div><h2 style="margin:3px 0 0">Riwayat Kendaraan</h2><div class="small muted">Catat sekali, cari kapan saja.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
- <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="exportBtn">Export</button><button class="tab" id="configBtn">Koneksi</button></div>
+ <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="exportBtn">Export</button></div>
  <div class="grid">
    <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
    <div class="card"><div class="small muted">Aktivitas</div><div class="kpi">${state.events.length}</div></div>
@@ -130,7 +125,7 @@ function renderApp(){
  ${v?vehicleSection(v):''}
  </main></div>`;
  $('#logout').onclick=()=>state.sb.auth.signOut();$('#addVehicle').onclick=()=>openVehicleModal();
- $('#voiceBtn').onclick=()=>openVoiceModal();$('#exportBtn').onclick=exportExcel;$('#configBtn').onclick=()=>renderSetup('Anda dapat mengganti koneksi Supabase di sini.');
+ $('#voiceBtn').onclick=()=>openVoiceModal();$('#exportBtn').onclick=exportExcel;$('#configBtn').onclick=()=>toast('Koneksi aplikasi dikelola otomatis.');
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
 }
 function vehicleSection(v){
