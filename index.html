@@ -266,7 +266,7 @@ function renderApp(){
  $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>${state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO'}</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
  <main class="wrap">
  <section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
- <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert ${state.plan==='pro'||state.plan==='owner'?'PRO':''}</button><button class="tab" id="exportBtn">Export</button></div>
+ <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert ${state.plan==='pro'||state.plan==='owner'?'PRO':''}</button><button class="tab" id="exportBtn">Export</button>${state.plan==='owner'?'<button class="tab" id="ownerBtn">👑 Owner</button>':''}</div>
  <div class="grid">
    <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
    <div class="card"><div class="small muted">Aktivitas</div><div class="kpi">${state.events.length}</div></div>
@@ -277,7 +277,7 @@ function renderApp(){
  ${v?vehicleSection(v):''}
  </main></div>`;
  $('#logout').onclick=()=>state.sb.auth.signOut();$('#addVehicle').onclick=()=>openVehicleModal();
- $('#voiceBtn').onclick=()=>openVoiceModal();$('#expertBtn').onclick=()=>openExpertModal();$('#exportBtn').onclick=()=>openExportModal();
+ $('#voiceBtn').onclick=()=>openVoiceModal();$('#expertBtn').onclick=()=>openExpertModal();$('#exportBtn').onclick=()=>openExportModal();if($('#ownerBtn'))$('#ownerBtn').onclick=()=>openOwnerModal();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
 }
 function vehicleSection(v){
@@ -377,6 +377,33 @@ function openVoiceModal(){
   const p=parseVoice(text);m.querySelector('#voicePreview').innerHTML=`<div class="card" style="box-shadow:none;background:#f8fafc"><div class="row between"><strong>Preview</strong><span class="badge warning">Belum disimpan</span></div><div class="two" style="margin-top:10px"><div><div class="small muted">Jenis</div><strong>${esc(p.type)}</strong></div><div><div class="small muted">Tanggal</div><strong>${esc(p.date)}</strong></div><div><div class="small muted">Judul</div><strong>${esc(p.title)}</strong></div><div><div class="small muted">Biaya</div><strong>${rupiah(p.cost)}</strong></div></div><div style="margin-top:10px" class="small">${esc(p.description)}</div><button class="btn primary" style="width:100%;margin-top:12px" id="confirmVoice">Konfirmasi & simpan</button></div>`;
   m.querySelector('#confirmVoice').onclick=()=>{closeModal(m);openEventModal(p)};
  };
+}
+
+function makeLicenseCode(){
+ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+ const part=()=>Array.from({length:4},()=>a[Math.floor(Math.random()*a.length)]).join('');
+ return 'VL-PRO-'+part()+'-'+part();
+}
+function openOwnerModal(){
+ const m=modal(`<div class="row between"><div><h3 style="margin:0">👑 Owner Console</h3><div class="small muted">Buat activation code PRO untuk pelanggan</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><div class="small" style="opacity:.7">NEW LICENSE</div><div id="newLicense" style="font-size:22px;font-weight:700;letter-spacing:.08em;margin-top:6px">—</div></div>
+ <div class="field" style="margin-top:12px"><label>Masa berlaku</label><select id="licenseExpiry"><option value="">Tidak kedaluwarsa</option><option value="30">30 hari</option><option value="90">90 hari</option><option value="365">1 tahun</option></select></div>
+ <div class="row"><button class="btn primary" style="flex:1" id="generateLicense">Generate License</button><button class="btn ghost" style="flex:1" id="copyLicense">Copy</button></div>
+ <div class="small muted" style="margin-top:10px">Kode hanya dapat dipakai satu akun pelanggan.</div>`);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ let current='';
+ m.querySelector('#generateLicense').onclick=async()=>{
+   current=makeLicenseCode();m.querySelector('#newLicense').textContent=current;setBusy(true);
+   try{
+     const days=Number(m.querySelector('#licenseExpiry').value)||null;
+     let exp=null;if(days)exp=new Date(Date.now()+days*86400000).toISOString();
+     const {data,error}=await state.sb.rpc('owner_grant_license',{p_code:current,p_expires_at:exp});
+     if(error)throw error;
+     toast('License PRO dibuat');
+   }catch(e){current='';m.querySelector('#newLicense').textContent='—';toast(e.message||'Gagal membuat license')}
+   finally{setBusy(false)}
+ };
+ m.querySelector('#copyLicense').onclick=async()=>{if(!current)return toast('Generate license dulu');try{await navigator.clipboard.writeText(current);toast('License disalin')}catch{toast(current)}};
 }
 
 function openUpgradeModal(msg){
