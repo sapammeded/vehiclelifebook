@@ -311,11 +311,11 @@ function closeModal(m){m?.remove()}
 
 function openVehicleModal(){
  if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas DEMO tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
- const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div>
+ const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div><button class="btn gray" type="button" id="voiceVehicle">🎙️ Isi data dengan Voice</button>
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
  <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
- <div class="field"><label>Catatan</label><textarea id="vNotes"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
+ <div class="field"><label>Catatan / hasil Voice</label><textarea id="vNotes"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
  m.querySelector('#saveVehicle').onclick=async()=>{
   const plate=m.querySelector('#vPlate').value.trim().toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
@@ -335,10 +335,10 @@ function openEventModal(prefill={}){
  <div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eDate" type="date" value="${esc(prefill.date||today())}"></div></div>
  <div class="field"><label>Judul *</label><input id="eTitle" value="${esc(prefill.title||'')}" placeholder="Contoh: Ganti oli + filter oli"></div>
  <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eCost" type="number" min="0" value="${prefill.cost??''}"></div><div class="field"><label>Odometer (km)</label><input id="eOdo" type="number" min="0" value="${prefill.odometer??''}"></div></div>
- <div class="field"><label>Deskripsi</label><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea></div>
+ <div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEvent">🎙️ Voice</button></div><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea></div>
  <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
  <button class="btn primary" style="width:100%" id="saveEvent">Simpan aktivitas</button>`);
- m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceEvent').onclick=()=>openInlineVoice('eDesc');
  m.querySelector('#saveEvent').onclick=async()=>{
   const title=m.querySelector('#eTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}
   const cost=Number(m.querySelector('#eCost').value||0),odo=m.querySelector('#eOdo').value===''?null:Number(m.querySelector('#eOdo').value);
