@@ -32,6 +32,17 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 .pro{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:0}
 .promptbox{background:#0b1220;color:#e2e8f0;border-radius:16px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:48vh;overflow:auto}
 .section-title{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:18px 0 8px}
+.landing{min-height:100vh;display:grid;place-items:center;padding:18px;background:radial-gradient(circle at 15% 10%,#243b6b 0,#0b1220 42%,#050811 100%);color:#fff}
+.landing-shell{width:min(980px,100%);display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:stretch}
+.welcome-video{position:relative;overflow:hidden;border-radius:28px;border:1px solid rgba(255,255,255,.13);background:#020617;box-shadow:0 30px 80px rgba(0,0,0,.45);min-height:520px}
+.welcome-video video{width:100%;height:100%;min-height:520px;display:block;object-fit:cover;background:#020617}
+.video-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:28px;background:linear-gradient(180deg,transparent 35%,rgba(2,6,23,.9))}
+.video-badge{display:inline-flex;width:max-content;padding:6px 10px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.08);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.landing-auth{align-self:center;background:rgba(255,255,255,.97);color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:28px;padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.28)}
+.landing-logo{display:flex;align-items:center;gap:12px;margin-bottom:22px}.landing-logo-mark{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;font-size:24px;box-shadow:0 10px 25px rgba(37,99,235,.28)}
+.feature-line{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:12px;color:#475569}.feature-line b{color:#0f172a;display:block}
+@media(max-width:820px){.landing-shell{grid-template-columns:1fr}.welcome-video{min-height:330px}.welcome-video video{min-height:330px}.landing-auth{padding:22px}.landing{padding:12px}}
+
 @media print{.top,.tabs,.btn,.voice{display:none!important}.wrap{max-width:none;padding:0}.card{box-shadow:none;break-inside:avoid}}
 @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr}.wrap{padding-left:12px;padding-right:12px}.topin{padding-left:12px;padding-right:12px}.hero{padding:15px}}
 @media(max-width:470px){.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.plate{font-size:18px}}
@@ -48,6 +59,8 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 // Publishable/anon key is intentionally public. NEVER put service_role/secret keys here.
 const SUPABASE_URL='https://oeuyhfuohaizwuljgzeg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
+// Welcome media: upload your own file to this exact repo path. No code change needed.
+const WELCOME_VIDEO='assets/welcome.mp4';
 const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',license:null};
 
 const $=s=>document.querySelector(s);
@@ -185,12 +198,32 @@ function renderSetup(msg=''){
 }
 
 function renderAuth(){
- $('#app').innerHTML=`<main class="auth"><div class="card"><div class="logo">🚗</div><h1>Vehicle Lifebook</h1><p class="muted">Masuk untuk membuka data kendaraan Anda.</p>
- <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="nama@email.com"></div>
- <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Minimal 6 karakter"></div>
- <div class="row"><button class="btn primary" id="login">Masuk</button><button class="btn ghost" id="signup">Daftar</button></div>
- <button class="btn gray" id="reset" style="margin-top:10px;width:100%">Kirim link reset password</button>
- <p class="small muted" style="margin-top:14px">Data kendaraan dipisahkan berdasarkan akun Supabase.</p></div></main>`;
+ $('#app').innerHTML=`<main class="landing"><div class="landing-shell">
+ <section class="welcome-video">
+   <video id="welcomeVideo" autoplay muted loop playsinline preload="metadata">
+     <source src="${WELCOME_VIDEO}" type="video/mp4">
+   </video>
+   <div class="video-overlay">
+     <span class="video-badge">Vehicle Lifebook</span>
+     <h1 style="font-size:clamp(28px,5vw,48px);line-height:1.05;margin:10px 0 6px">Know your vehicle.<br>Keep its story.</h1>
+     <div style="color:#cbd5e1;font-size:12px;max-width:500px">Digital vehicle history, intelligent records, and a professional Automotive Expert prompt engine.</div>
+   </div>
+ </section>
+ <section class="landing-auth">
+   <div class="landing-logo"><div class="landing-logo-mark">🚘</div><div><div style="font-weight:700;font-size:20px">Vehicle Lifebook</div><div class="small muted">Professional Vehicle Intelligence</div></div></div>
+   <h2 style="margin:0 0 6px">Selamat datang.</h2>
+   <p class="muted small" style="margin-top:0">Masuk untuk membuka seluruh riwayat kendaraan Anda.</p>
+   <div class="field" style="margin-top:20px"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="nama@email.com"></div>
+   <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Minimal 6 karakter"></div>
+   <div class="row"><button class="btn primary" style="flex:1" id="login">Masuk</button><button class="btn ghost" style="flex:1" id="signup">Daftar</button></div>
+   <button class="btn gray" id="reset" style="margin-top:10px;width:100%">Kirim link reset password</button>
+   <div class="section-title">Di dalam Lifebook</div>
+   <div class="feature-line"><span>✓</span><div><b>Complete Vehicle History</b>Servis, BBM, kerusakan, part, inspeksi & biaya.</div></div>
+   <div class="feature-line"><span>✓</span><div><b>Voice-first recording</b>Catat aktivitas kendaraan secara natural.</div></div>
+   <div class="feature-line"><span>◆</span><div><b>PRO Automotive Expert</b>Buat prompt expert dari konteks kendaraan Anda.</div></div>
+   <p class="small muted" style="margin-top:18px">Video welcome dapat diganti kapan saja dengan mengunggah <b>assets/welcome.mp4</b> ke repository GitHub.</p>
+ </section>
+ </div></main>`;
  $('#login').onclick=()=>auth('login');$('#signup').onclick=()=>auth('signup');$('#reset').onclick=resetPassword;
 }
 async function auth(mode){
@@ -227,7 +260,7 @@ function renderApp(){
  const v=state.vehicles.find(x=>x.id===state.selected);
  $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>Digital vehicle history</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span><button class="btn gray" id="logout">Keluar</button></div></div></header>
  <main class="wrap">
- <section class="hero card"><div class="row between wraprow"><div><div class="small muted">LIFEBOOK</div><h2 style="margin:3px 0 0">Riwayat Kendaraan</h2><div class="small muted">Catat sekali, cari kapan saja.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
+ <section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
  <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert</button><button class="tab" id="exportBtn">Export</button></div>
  <div class="grid">
    <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
