@@ -139,7 +139,7 @@ I. PERTANYAAN LANJUTAN bila benar-benar diperlukan
 Gunakan Bahasa Indonesia yang natural, tegas, teknis, dan mudah dipahami. Jangan memberi jawaban generik. Hubungkan analisis dengan kendaraan dan riwayat yang diberikan.`;
 }
 function openExpertModal(){
- if(state.plan!=='pro'){toast('Fitur Automotive Expert tersedia untuk PRO.');return}
+ if(state.plan!=='pro' && state.plan!=='owner'){openUpgradeModal('Automotive Expert adalah fitur PRO.');return}
  const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
  const m=modal(`<div class="row between"><div><h3 style="margin:0">💎 Automotive Expert</h3><div class="small muted">Universal Expert Prompt Engine</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="pro card" style="margin-top:12px"><strong>Tanya apa saja tentang kendaraan ini.</strong><div class="small" style="margin-top:5px;opacity:.9">Diagnosis · modifikasi · racing · styling · spare part · performa · risiko · maintenance</div></div>
