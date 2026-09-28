@@ -307,7 +307,7 @@ function attachVoice(root,targetId,onText){const b=root.querySelector('[data-voi
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
  <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
  <div class="field"><label>Catatan</label><textarea id="vNotes2"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
- m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);attachVoice(m,'vNotes',s=>parseVehicleVoice(s,m));
  m.querySelector('#saveVehicle').onclick=async()=>{
   const plate=m.querySelector('#vPlate').value.trim().toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
   setBusy(true);try{
@@ -341,9 +341,20 @@ function openEventModal(prefill={}){
  };
 }
 
+function parseIndoNumberWords(s){
+ const w={nol:0,satu:1,sebuah:1,dua:2,tiga:3,empat:4,lima:5,enam:6,tujuh:7,delapan:8,sembilan:9,sepuluh:10,sebelas:11};
+ const t=String(s).toLowerCase().replace(/[^a-z\s-]/g,' ').replace(/-/g,' ').trim();if(!t)return null;
+ const a=t.split(/\s+/);let total=0,cur=0,found=false;
+ for(let i=0;i<a.length;i++){const x=a[i];if(w[x]!=null){cur+=w[x];found=true}else if(x==='belas'){cur=(cur||1)+10;found=true}else if(x==='puluh'){cur=(cur||1)*10;found=true}else if(x==='ratus'){cur=(cur||1)*100;found=true}else if(x==='ribu'){total+=(cur||1)*1000;cur=0;found=true}else if(x==='juta'){total+=(cur||1)*1000000;cur=0;found=true}}
+ return found?total+cur:null;
+}
 function parseMoney(s){
- const m=String(s).toLowerCase().replace(/\./g,'').replace(/,/g,'').match(/(\d[\d\s]*)\s*(juta|jt|ribu|rb|k|rupiah|rp)?/);
- if(!m)return null;let n=Number(m[1].replace(/\s/g,''));const u=m[2]||'';if(['juta'].includes(u))n*=1e6;else if(['jt'].includes(u))n*=1e6;else if(['ribu','rb','k'].includes(u))n*=1e3;return n;
+ const raw=String(s).toLowerCase();
+ const m=raw.replace(/\./g,'').replace(/,/g,'').match(/(\d[\d\s]*)\s*(juta|jt|ribu|rb|k|rupiah|rp)?/);
+ if(m){let n=Number(m[1].replace(/\s/g,''));const u=m[2]||'';if(u==='juta'||u==='jt')n*=1e6;else if(['ribu','rb','k'].includes(u))n*=1e3;return n}
+ const wm=raw.match(/([a-z\s-]+?)(?=\s*(?:rupiah|rp|juta|jt|ribu|rb)\b|$)/);
+ const n=parseIndoNumberWords(wm?wm[1]:raw);if(n!=null)return n;
+ return null;
 }
 function parseVoice(text){
  const t=text.toLowerCase().trim(), out={source:'voice',raw_input:text,date:today(),type:'note',title:text,description:text,cost:0};
