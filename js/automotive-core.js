@@ -111,7 +111,7 @@ function openEngineeringLab(vehicle){
  const m=modal(`<div class="row between"><div><h3>⚙️ Mechanical Engineering Lab</h3><div class="small muted">Thermal expansion, piston/block clearance, ring gap, deck & bearing clearance.</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="field"><label>Calculator</label><select id="engType">
  <option value="pistonwall">Piston ↔ Cylinder Wall</option><option value="ringgap">Ring End Gap at Temperature</option><option value="deck">Piston-to-Deck</option><option value="bearing">Bearing Oil Clearance</option><option value="rod">Rod Ratio</option><option value="valve">Piston-to-Valve Safety</option></select></div>
- <div id="engFields"></div><div class="small muted" style="margin-top:8px">⚠️ Coefficient/material dan minimum clearance harus berasal dari OEM/piston manufacturer bila tersedia. Tanpa spec tersebut hasil hanya engineering calculation, bukan assembly specification.</div>
+ <div class="row" style="margin-top:8px"><button class="btn gray" id="loadVerifiedSpecs">🔎 Muat OEM/Verified Specs</button><span id="specStatus" class="small muted">Belum dimuat</span></div><div id="engFields"></div><div class="small muted" style="margin-top:8px">⚠️ Input yang berasal dari sumber terverifikasi akan ditandai. Parameter kritis yang belum verified tidak boleh diperlakukan sebagai spesifikasi assembly.</div>
  <pre id="engResult" style="white-space:pre-wrap;margin-top:10px">Isi parameter.</pre><button class="btn primary" id="runEng" style="width:100%">Hitung & Simpan</button>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
  const fs={
@@ -125,6 +125,20 @@ function openEngineeringLab(vehicle){
  const funcs={pistonwall:'pistonWallClearance',ringgap:'ringEndGapAtTemp',deck:'deckHeight',bearing:'bearingClearance',rod:'rodRatio',valve:'valvePistonSafety'};
  function render(){m.querySelector('#engFields').innerHTML='<div class="two">'+fs[m.querySelector('#engType').value].map(x=>'<div class="field"><label>'+x[1]+'</label><input id="e_'+x[0]+'" type="number" step="any"></div>').join('')+'</div>'}
  m.querySelector('#engType').onchange=render;render();
+ m.querySelector('#loadVerifiedSpecs').onclick=async()=>{
+  try{
+   m.querySelector('#specStatus').textContent='Mencari data tersimpan…';
+   const ctx=await loadVehicleVerifiedSpecs(vehicle);
+   const specs=ctx?.specs||[];
+   const map={bore_mm:'coldBoreMm',cylinder_bore_mm:'coldBoreMm',piston_diameter_mm:'coldPistonMm',ring_end_gap_mm:'coldGapMm',ring_diameter_mm:'ringDiameterMm',rod_length_mm:'rodLengthMm',stroke_mm:'strokeMm'};
+   const selected={};
+   specs.forEach(s=>{if(map[s.spec_key] && (s.verification_status==='verified'||s.verification_status==='corroborated')) selected[map[s.spec_key]]=s.value});
+   render();
+   Object.entries(selected).forEach(([k,v])=>{const el=m.querySelector('#e_'+k);if(el&&typeof v!=='object')el.value=String(v).replace(/[^0-9.\\-]/g,'').split('-')[0]});
+   const verified=specs.filter(s=>s.verification_status==='verified').length;
+   m.querySelector('#specStatus').textContent=specs.length+' spec ditemukan · '+verified+' verified';
+  }catch(e){m.querySelector('#specStatus').textContent='Gagal: '+e.message}
+ };
  m.querySelector('#runEng').onclick=async()=>{try{const type=m.querySelector('#engType').value,o={};fs[type].forEach(x=>o[x[0]]=Number(m.querySelector('#e_'+x[0]).value));const out=NS.engineering[funcs[type]](o);m.querySelector('#engResult').textContent=JSON.stringify(out,null,2);const s=await state.sb.from('vehicle_calculations').insert({vehicle_id:vehicle.id,calculation_type:'mechanical_'+type,formula_version:out.formulaVersion||'engineering-v1',inputs:o,outputs:out,assumptions:{requiresOemSpec:type==='valve'},deterministic:true,created_by:state.user.id});if(s.error)throw s.error;toast0('Engineering calculation tersimpan')}catch(e){m.querySelector('#engResult').textContent='ERROR: '+e.message}};
 }
 
