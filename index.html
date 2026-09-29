@@ -430,7 +430,8 @@ async function auth(mode){
 }
 async function resetPassword(){
  const email=$('#email').value.trim();if(!email){toast('Isi email dulu');return}
- const {error}=await state.sb.auth.resetPasswordForEmail(email,{redirectTo:location.href});
+ const redirectTo='https://sapammeded.github.io/vehiclelifebook/';
+ const {error}=await state.sb.auth.resetPasswordForEmail(email,{redirectTo});
  toast(error?error.message:'Link reset dikirim jika email terdaftar.');
 }
 
