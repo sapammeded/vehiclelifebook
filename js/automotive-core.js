@@ -424,8 +424,8 @@ NS.oem={
   },
   missionClassify(question=''){
     const q=String(question||'').toLowerCase();
-    const cc=[...q.matchAll(/(\\d+(?:[.,]\\d+)?)\\s*cc\\b/gi)].map(x=>Number(x[1].replace(',','.')));
-    const tm=q.match(/(?:jadi|ke|menjadi|target|hingga|sampai)\\s*(\\d+(?:[.,]\\d+)?)\\s*cc\\b/i);
+    const cc=[...q.matchAll(/(\d+(?:[.,]\d+)?)\s*cc\b/gi)].map(x=>Number(x[1].replace(',','.')));
+    const tm=q.match(/(?:jadi|ke|menjadi|target|hingga|sampai)\s*(\d+(?:[.,]\d+)?)\s*cc\b/i);
     const target=tm?Number(tm[1].replace(',','.')):(cc.length>1?cc[cc.length-1]:null);
     const domains=[];
     const add=(d,re)=>{if(re.test(q)&&!domains.includes(d))domains.push(d)};
