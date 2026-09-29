@@ -349,24 +349,34 @@ async function loadEvents(){
 
 function renderApp(){
  const v=state.vehicles.find(x=>x.id===state.selected);
- $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>${state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO'} · ${state.plan==='pro'?'LICENSE AKTIF':state.plan==='owner'?'FULL ACCESS':'1 KENDARAAN / 20 AKTIVITAS'}</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span>${state.plan!=='owner'?'<button class="btn primary" id="licenseBtn">${state.plan==='pro'?'⚙️ LICENSE PRO':'💎 UBAH KE PRO'}</button>':''}<button class="btn gray" id="logout">Keluar</button></div></div></header>
- <main class="wrap">
- <section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
- <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert ${state.plan==='pro'||state.plan==='owner'?'PRO':''}</button><button class="tab" id="exportBtn">Export</button>${state.plan==='owner'?'<button class="tab" id="ownerBtn">👑 Owner</button>':''}</div>
- <div class="grid">
-   <div class="card"><div class="small muted">Kendaraan</div><div class="kpi">${state.vehicles.length}</div></div>
-   <div class="card"><div class="small muted">Aktivitas</div><div class="kpi">${state.events.length}</div></div>
-   <div class="card"><div class="small muted">Biaya terlihat</div><div class="kpi" style="font-size:18px">${rupiah(state.events.reduce((a,e)=>a+Number(e.total_cost||0),0))}</div></div>
- </div>
- <section style="margin-top:12px" class="card"><div class="row between"><h3 style="margin:0">Kendaraan</h3><button class="btn ghost" id="voiceBtn">🎙️ Input suara</button></div>
- <div style="margin-top:10px">${state.vehicles.length?state.vehicles.map(x=>`<button class="card vehicle" data-vehicle="${x.id}" style="width:100%;text-align:left;margin-bottom:8px;box-shadow:none"><div><div class="plate">${esc(x.plate_number)}</div><div class="small muted">${esc([x.brand,x.model,x.year].filter(Boolean).join(' · ')||'Profil belum lengkap')}</div></div><span class="badge ${x.id===state.selected?'success':''}">${x.id===state.selected?'AKTIF':'PILIH'}</span></button>`).join(''):'<div class="empty">Belum ada kendaraan.<br>Tambahkan kendaraan pertama.</div>'}</div></section>
- ${v?vehicleSection(v):''}
- </main></div>`;
- $('#logout').onclick=()=>state.sb.auth.signOut();if($('#licenseBtn'))$('#licenseBtn').onclick=()=>openUpgradeModal('Masukkan Activation Code PRO Anda.');$('#addVehicle').onclick=()=>openVehicleModal();
- if($('#ownerBtn'))$('#ownerBtn').onclick=()=>openOwnerPanel();
- $('#voiceBtn').onclick=()=>openVoiceModal();$('#expertBtn').onclick=()=>openExpertModal();$('#exportBtn').onclick=()=>openExportModal();if($('#ownerBtn'))$('#ownerBtn').onclick=()=>openOwnerModal();
+ const vehicleCards=state.vehicles.length ? state.vehicles.map(x=>{
+   const meta=esc([x.brand,x.model,x.year].filter(Boolean).join(' · ')||'Profil belum lengkap');
+   const active=x.id===state.selected;
+   return '<button class="card vehicle" data-vehicle="'+esc(x.id)+'" style="width:100%;text-align:left;margin-bottom:8px;box-shadow:none"><div><div class="plate">'+esc(x.plate_number)+'</div><div class="small muted">'+meta+'</div></div><span class="badge '+(active?'success':'')+'">'+(active?'AKTIF':'PILIH')+'</span></button>';
+ }).join('') : '<div class="empty">Belum ada kendaraan.<br>Tambahkan kendaraan pertama.</div>';
+ const planLabel=state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO';
+ const planStatus=state.plan==='pro'?'LICENSE AKTIF':state.plan==='owner'?'FULL ACCESS':'1 KENDARAAN / 20 AKTIVITAS';
+ const licenseButton=state.plan!=='owner' ? '<button class="btn primary" id="licenseBtn">'+(state.plan==='pro'?'⚙️ LICENSE PRO':'💎 UBAH KE PRO')+'</button>' : '';
+ const ownerButton=state.plan==='owner'?'<button class="tab" id="ownerBtn">👑 Owner</button>':'';
+ const expertLabel=state.plan==='pro'||state.plan==='owner'?'PRO':'';
+ const totalCost=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
+ $('#app').innerHTML='<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>'+planLabel+' · '+planStatus+'</small></div><div class="row"><span class="small muted">'+esc(state.user?.email||'')+'</span>'+licenseButton+'<button class="btn gray" id="logout">Keluar</button></div></div></header>'+
+ '<main class="wrap"><section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>'+
+ '<div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert '+expertLabel+'</button><button class="tab" id="exportBtn">Export</button>'+ownerButton+'</div>'+
+ '<div class="grid"><div class="card"><div class="small muted">Kendaraan</div><div class="kpi">'+state.vehicles.length+'</div></div><div class="card"><div class="small muted">Aktivitas</div><div class="kpi">'+state.events.length+'</div></div><div class="card"><div class="small muted">Biaya terlihat</div><div class="kpi" style="font-size:18px">'+rupiah(totalCost)+'</div></div></div>'+
+ '<section style="margin-top:12px" class="card"><div class="row between"><h3 style="margin:0">Kendaraan</h3><button class="btn ghost" id="voiceBtn">🎙️ Input suara</button></div><div style="margin-top:10px">'+vehicleCards+'</div></section>'+
+ (v?vehicleSection(v):'')+'</main></div>';
+ const logout=$('#logout'); if(logout) logout.onclick=()=>state.sb.auth.signOut();
+ const licenseBtn=$('#licenseBtn'); if(licenseBtn) licenseBtn.onclick=()=>openUpgradeModal('Masukkan Activation Code PRO Anda.');
+ const addVehicle=$('#addVehicle'); if(addVehicle) addVehicle.onclick=()=>openVehicleModal();
+ const ownerBtn=$('#ownerBtn'); if(ownerBtn) ownerBtn.onclick=()=>openOwnerModal();
+ const voiceBtn=$('#voiceBtn'); if(voiceBtn) voiceBtn.onclick=()=>openVoiceModal();
+ const expertBtn=$('#expertBtn'); if(expertBtn) expertBtn.onclick=()=>openExpertModal();
+ const exportBtn=$('#exportBtn'); if(exportBtn) exportBtn.onclick=()=>openExportModal();
+ const addEvent=$('#addEvent'); if(addEvent) addEvent.onclick=()=>openEventModal();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
 }
+
 function vehicleSection(v){
  const total=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
  return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><button class="btn primary" id="addEvent">+ Aktivitas</button></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
