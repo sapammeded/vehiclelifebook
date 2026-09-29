@@ -1,0 +1,5 @@
+-- Vehicle Lifebook v2.0.0
+-- Applied to Supabase project oeuyhfuohaizwuljgzeg as migration:
+-- add_automotive_intelligence_foundation_v2
+-- This file is the repeatable source record for the production migration.
+-- See Supabase migration history for the exact applied DDL.
