@@ -65,7 +65,7 @@ const SUPABASE_URL='https://oeuyhfuohaizwuljgzeg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
 // Welcome media: upload your own file to this exact repo path. No code change needed.
 const WELCOME_VIDEO='assets/welcome.mp4';
-const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',configuredPlan:'demo',accessValid:true,accessState:'demo',license:null,licenseStatus:null,licenseExpiresAt:null,maxVehicles:1,maxEvents:20};
+const state={sb:null,user:null,vehicles:[],selected:null,events:[],mediaByEvent:{},storageUsage:null,busy:false,voice:null,plan:'demo',configuredPlan:'demo',accessValid:true,accessState:'demo',license:null,licenseStatus:null,licenseExpiresAt:null,maxVehicles:1,maxEvents:20};
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -391,8 +391,20 @@ async function resetPassword(){
  toast(error?error.message:'Link reset dikirim jika email terdaftar.');
 }
 
-async function afterLogin(){await loadEntitlement();await loadVehicles();renderApp()}
+async function afterLogin(){await loadEntitlement();await loadVehicles();await loadStorageUsage();renderApp()}
 async function loadEntitlement(){try{const {data,error}=await state.sb.rpc('get_my_entitlement');if(error)throw error;state.plan=data?.plan||'demo';state.configuredPlan=data?.configured_plan||state.plan;state.accessValid=data?.access_valid!==false;state.accessState=data?.access_state||state.plan;state.license=data?.license_id||null;state.licenseStatus=data?.license_status||null;state.licenseExpiresAt=data?.expires_at||null;state.maxVehicles=Number(data?.max_vehicles||1);state.maxEvents=Number(data?.max_events||20)}catch(e){state.plan='demo';state.configuredPlan='demo';state.accessValid=false;state.accessState='invalid';state.license=null;state.licenseStatus=null;state.licenseExpiresAt=null;state.maxVehicles=1;state.maxEvents=20}}
+async function loadStorageUsage(){
+ try{
+  const {data,error}=await state.sb.rpc('get_my_storage_usage');
+  if(error)throw error;
+  state.storageUsage=Array.isArray(data)?data[0]||null:data||null;
+ }catch{state.storageUsage=null}
+}
+function formatBytes(n){
+ const x=Number(n)||0;if(x<1024)return x+' B';
+ const units=['KB','MB','GB','TB'];let v=x/1024,i=0;while(v>=1024&&i<units.length-1){v/=1024;i++}
+ return (v<10?v.toFixed(1):Math.round(v))+' '+units[i];
+}
 async function loadVehicles(){
  const {data,error}=await state.sb.from('vehicles').select('*').order('plate_number');
  if(error){toast(error.message);return}state.vehicles=data||[];
@@ -448,7 +460,7 @@ function renderApp(){
  const exportBtn=$('#exportBtn'); if(exportBtn) exportBtn.onclick=()=>openExportModal();
  const addEvent=$('#addEvent'); if(addEvent) addEvent.onclick=()=>openEventModal();
  const globalAutoBtn=$('#globalAutoBtn'); if(globalAutoBtn) globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
- document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});document.querySelectorAll('[data-event-media]').forEach(b=>b.onclick=()=>openEventMediaModal(b.dataset.eventMedia));
+ document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});document.querySelectorAll('[data-event-media]').forEach(b=>b.onclick=()=>openEventMediaModal(b.dataset.eventMedia));document.querySelectorAll('[data-edit-event]').forEach(b=>b.onclick=()=>openEditEventModal(b.dataset.editEvent));document.querySelectorAll('[data-delete-event]').forEach(b=>b.onclick=()=>deleteEvent(b.dataset.deleteEvent));
 }
 
 function vehicleSection(v){
@@ -465,7 +477,7 @@ function mediaThumbsHtml(eventId){
 function openEventMediaModal(eventId){
  const e=state.events.find(x=>x.id===eventId);if(!e)return;
  const m=modal('<div class="row between"><div><h3>📷 Foto aktivitas</h3><div class="small muted">'+esc(e.event_date+' · '+e.title)+'</div></div><button class="btn gray" data-close>✕</button></div>'+
- '<div class="card" style="margin-top:12px;background:#f8fafc;box-shadow:none"><div class="small muted">Foto tersimpan untuk aktivitas ini</div><div id="eventMediaGrid" class="media-grid" style="margin-top:10px"></div></div>'+
+ '<div class="card" style="margin-top:12px;background:#f8fafc;box-shadow:none"><div class="small muted">Foto tersimpan untuk aktivitas ini</div><div class="small muted">Storage: ${state.storageUsage?formatBytes(state.storageUsage.used_bytes)+' / '+formatBytes(state.storageUsage.quota_bytes):'—'}</div><div id="eventMediaGrid" class="media-grid" style="margin-top:10px"></div></div>'+
  '<div class="field" style="margin-top:12px"><label>Tambah foto — bebas berapa saja</label><input id="eventPhotos" type="file" accept="image/*" multiple><input id="eventCamera" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraBtn" type="button">📷 Kamera</button><span id="eventPhotoCount" class="small muted">Belum ada foto baru</span></div></div>'+
  '<button class="btn primary" style="width:100%" id="uploadEventPhotos">⬆️ Simpan Foto ke Aktivitas</button>');
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
@@ -496,7 +508,7 @@ function openEventMediaModal(eventId){
          ok++;
        }catch(err){fail++;console.error(err)}
      }
-     await loadEventMedia();render();m.querySelector('#eventPhotoCount').textContent=fail?ok+' tersimpan • '+fail+' gagal':ok+' foto tersimpan';toast(fail?'Sebagian foto gagal disimpan':'Semua foto tersimpan');
+     await loadEventMedia();await loadStorageUsage();render();m.querySelector('#eventPhotoCount').textContent=fail?ok+' tersimpan • '+fail+' gagal':ok+' foto tersimpan';toast(fail?'Sebagian foto gagal disimpan':'Semua foto tersimpan');
    }finally{setBusy(false)}
  };
 }
@@ -511,9 +523,50 @@ async function compressMediaFile(file){
    };reader.readAsDataURL(file);
  });
 }
+function openEditEventModal(eventId){
+ const e=state.events.find(x=>x.id===eventId);if(!e)return;
+ const m=modal(`<div class="row between"><h3>✏️ Edit aktivitas</h3><button class="btn gray" data-close>✕</button></div>
+ <div class="badge success">${esc(currentVehicle()?.plate_number||'')}</div>
+ <div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eeType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eeDate" type="date" value="${esc(e.event_date||today())}"></div></div>
+ <div class="field"><label>Judul *</label><input id="eeTitle" value="${esc(e.title||'')}"></div>
+ <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eeCost" type="number" min="0" value="${Number(e.total_cost||0)}"></div><div class="field"><label>Odometer (km)</label><input id="eeOdo" type="number" min="0" value="${e.odometer??''}"></div></div>
+ <div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEditEvent">🎙️ Voice</button></div><textarea id="eeDesc" style="min-height:150px">${esc(e.description||'')}</textarea><div id="editEventVoiceStatus" class="small muted">Bisa bicara terus sampai Anda menekan Stop.</div></div>
+ <div class="row" style="margin-top:12px"><button class="btn gray" id="editEventPhotos" type="button">📷 Kelola foto (${mediaCount(eventId)})</button><button class="btn primary" id="saveEditEvent" style="flex:1">Simpan perubahan</button></div>`);
+ m.querySelector('#eeType').value=e.event_type||'note';
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#voiceEditEvent').onclick=()=>openInlineVoice('eeDesc','voiceEditEvent','editEventVoiceStatus');
+ m.querySelector('#editEventPhotos').onclick=()=>{closeModal(m);openEventMediaModal(eventId)};
+ m.querySelector('#saveEditEvent').onclick=async()=>{
+  const title=m.querySelector('#eeTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}
+  const cost=Number(m.querySelector('#eeCost').value||0),odo=m.querySelector('#eeOdo').value===''?null:Number(m.querySelector('#eeOdo').value);
+  if(cost<0||(odo!=null&&odo<0)){toast('Nilai biaya/odometer tidak valid');return}
+  setBusy(true);try{
+   const {error}=await state.sb.from('vehicle_events').update({event_type:m.querySelector('#eeType').value,event_date:m.querySelector('#eeDate').value,title,description:m.querySelector('#eeDesc').value.trim()||null,total_cost:cost,odometer:odo}).eq('id',eventId).eq('created_by',state.user.id);
+   if(error)throw error;
+   closeModal(m);await loadVehicles();await loadStorageUsage();renderApp();toast('Aktivitas diperbarui');
+  }catch(err){toast(err.message||'Gagal mengedit aktivitas')}finally{setBusy(false)}
+ };
+}
+async function deleteEvent(eventId){
+ const e=state.events.find(x=>x.id===eventId);if(!e)return;
+ if(!confirm('Hapus aktivitas "'+e.title+'"? Semua foto aktivitas ini juga akan dihapus.'))return;
+ setBusy(true);
+ try{
+  const {data:media,error:me}=await state.sb.from('vehicle_media').select('id,storage_path').eq('event_id',eventId).eq('uploaded_by',state.user.id);
+  if(me)throw me;
+  const paths=(media||[]).map(x=>x.storage_path).filter(Boolean);
+  if(paths.length){
+    const {error:se}=await state.sb.storage.from('vehicle-evidence').remove(paths);
+    if(se)throw se;
+  }
+  const {error}=await state.sb.from('vehicle_events').delete().eq('id',eventId).eq('created_by',state.user.id);
+  if(error)throw error;
+  await loadVehicles();await loadStorageUsage();renderApp();toast('Aktivitas dan foto dihapus');
+ }catch(err){toast(err.message||'Gagal menghapus aktivitas')}finally{setBusy(false)}
+}
 function timelineHtml(events){
  if(!events.length)return '<div class="empty">Belum ada aktivitas untuk kendaraan ini.</div>';
- return events.map(e=>`<article class="card event" style="margin-bottom:9px;box-shadow:none"><div class="row between"><div><div class="type">${esc(e.event_type)}</div><strong>${esc(e.title)}</strong></div><span class="cost">${rupiah(e.total_cost)}</span></div><div class="small muted" style="margin-top:6px">${esc(e.event_date)} ${e.odometer!=null?' · '+Number(e.odometer).toLocaleString('id-ID')+' km':''}</div>${e.description?'<div style="margin-top:7px">'+esc(e.description)+'</div>':''}${e.raw_input?'<div class="small muted" style="margin-top:7px">Voice: '+esc(e.raw_input)+'</div>':''}${mediaThumbsHtml(e.id)}<div class="row" style="margin-top:9px"><button class="btn gray" type="button" data-event-media="${esc(e.id)}">📷 Foto (${mediaCount(e.id)})</button></div></article>`).join('');
+ return events.map(e=>`<article class="card event" style="margin-bottom:9px;box-shadow:none"><div class="row between"><div><div class="type">${esc(e.event_type)}</div><strong>${esc(e.title)}</strong></div><span class="cost">${rupiah(e.total_cost)}</span></div><div class="small muted" style="margin-top:6px">${esc(e.event_date)} ${e.odometer!=null?' · '+Number(e.odometer).toLocaleString('id-ID')+' km':''}</div>${e.description?'<div style="margin-top:7px">'+esc(e.description)+'</div>':''}${e.raw_input?'<div class="small muted" style="margin-top:7px">Voice: '+esc(e.raw_input)+'</div>':''}${mediaThumbsHtml(e.id)}<div class="row" style="margin-top:9px;flex-wrap:wrap"><button class="btn gray" type="button" data-event-media="${esc(e.id)}">📷 Foto (${mediaCount(e.id)})</button><button class="btn gray" type="button" data-edit-event="${esc(e.id)}">✏️ Edit</button><button class="btn gray" type="button" data-delete-event="${esc(e.id)}">🗑️ Hapus</button></div></article>`).join('');
 }
 
 function modal(inner){
@@ -570,7 +623,7 @@ function openEventModal(prefill={}){
      const ins=await state.sb.from('vehicle_media').insert({vehicle_id:state.selected,event_id:eventId,uploaded_by:state.user.id,storage_path:path,file_name:file.name,mime_type:'image/jpeg',file_size:packed.blob.size,metadata:{original_type:file.type,original_size:file.size,width:packed.width,height:packed.height}});
      if(ins.error){await state.sb.storage.from('vehicle-evidence').remove([path]);throw ins.error}ok++;
    }catch(err){fail++;console.error(err)}}
-   closeModal(m);await loadVehicles();renderApp();toast(files.length?(fail?ok+' foto tersimpan • '+fail+' gagal':'Aktivitas + '+ok+' foto tersimpan'):'Aktivitas tersimpan');
+   closeModal(m);await loadVehicles();await loadStorageUsage();renderApp();toast(files.length?(fail?ok+' foto tersimpan • '+fail+' gagal':'Aktivitas + '+ok+' foto tersimpan'):'Aktivitas tersimpan');
   }catch(e){toast(e.message||'Gagal menyimpan aktivitas')}finally{setBusy(false)}
  };
 }
