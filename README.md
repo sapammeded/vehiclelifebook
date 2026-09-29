@@ -1,25 +1,31 @@
 # Vehicle Lifebook
 
-Vehicle Lifebook adalah aplikasi mobile-first untuk mencatat dan menelusuri seluruh riwayat kendaraan.
+Mobile-first vehicle intelligence and digital vehicle history app.
 
 ## Stack
-- Single `index.html`
+- Single-file frontend: `index.html`
 - Supabase Auth + PostgreSQL + RLS
-- Voice input menggunakan Web Speech API jika browser mendukung
+- Server-side PostgreSQL entitlement enforcement
+- Web Speech API for optional voice input
 - GitHub Pages
 
-## Supabase
-Project URL:
-`https://oeuyhfuohaizwuljgzeg.supabase.co`
+## Production configuration
+The production Supabase URL and publishable key are bundled in `index.html`.
+The browser must never contain a service-role or other secret key.
 
-Jangan pernah memasukkan `service_role` key ke HTML. Gunakan publishable/anon key.
+## Run
+Open the GitHub Pages deployment. Authentication is handled directly by Supabase.
+There is no production setup screen.
 
-## Jalankan
-Buka `index.html` melalui GitHub Pages. Pada halaman setup masukkan:
-1. Supabase Project URL
-2. Publishable/anon key
+## Architecture
+The current UI is intentionally incremental and mobile-first. Frontend limits are UX guards; PostgreSQL enforces authorization and package limits.
 
-Konfigurasi disimpan lokal di perangkat.
+Core domains include vehicles, events, service/fuel/damage/part/inspection/expense details, media, audit history, profiles and licenses.
 
-## Catatan
-Voice selalu melewati preview/konfirmasi sebelum event disimpan. Jika browser tidak mendukung Speech Recognition, input teks tetap tersedia.
+## Development rules
+- Preserve existing vehicle history.
+- Use repeatable Supabase migrations for schema changes.
+- Keep RLS enabled.
+- Do not use an LLM for critical mathematics.
+- Technical conclusions must distinguish evidence, inference and unknowns.
+- Validate JavaScript syntax before deployment.
