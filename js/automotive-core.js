@@ -210,9 +210,17 @@ async function openModification(vehicle){
  <div class="field"><label>Baseline JSON</label><textarea id="modBase">{}</textarea></div>
  <div class="field"><label>Test plan</label><textarea id="modTest" placeholder="Parameter, kondisi, acceptance criteria..."></textarea></div>
  <div class="small muted">Status compatibility tetap UNKNOWN sampai interface, dimension, load, electrical/thermal compatibility dan evidence diverifikasi.</div>
- <button class="btn primary" style="width:100%;margin-top:10px" id="saveMod">Simpan Modification Record</button>`);
+ <div id="modCompatOut" class="card" style="box-shadow:none;margin-top:10px;background:#f8fafc">Belum dilakukan compatibility gate.</div>
+ <div class="row" style="margin-top:10px"><button class="btn gray" id="checkModCompat">🔎 Check Compatibility</button><button class="btn primary" id="saveMod" style="flex:1">Simpan Modification Record</button></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
- m.querySelector('#saveMod').onclick=async()=>{
+ m.querySelector('#checkModCompat').onclick=async()=>{
+  try{
+    let baseline={};try{baseline=JSON.parse(m.querySelector('#modBase').value||'{}')}catch{throw Error('Baseline JSON tidak valid')}
+    const ctx=await loadVehicleVerifiedSpecs(vehicle);const result=NS.oem.evaluateModificationCompatibility(vehicle,{system:m.querySelector('#modSystem').value.trim(),title:m.querySelector('#modTitle').value.trim(),baseline,target_effect:m.querySelector('#modTarget').value.trim()},ctx?.specs||[]);
+    m.querySelector('#modCompatOut').textContent=JSON.stringify(result,null,2);
+  }catch(e){m.querySelector('#modCompatOut').textContent='ERROR: '+e.message}
+};
+m.querySelector('#saveMod').onclick=async()=>{
   try{
    const system=m.querySelector('#modSystem').value.trim(),title=m.querySelector('#modTitle').value.trim();if(!system||!title)throw Error('System dan nama modifikasi wajib');
    let baseline={};try{baseline=JSON.parse(m.querySelector('#modBase').value||'{}')}catch{throw Error('Baseline JSON tidak valid')}
@@ -492,6 +500,26 @@ NS.healthEngine={
   }
 };
 
+
+NS.oem.evaluateModificationCompatibility=(vehicle,modification,verifiedSpecs=[])=>{
+  const required=['dimensions','load','thermal_limit','electrical_limit','brake_capacity','chassis_capacity'];
+  const text=JSON.stringify(modification||{}).toLowerCase();
+  const systems=String(modification?.system||'').toLowerCase();
+  const critical=verifiedSpecs.filter(s=>s.verification_status==='verified');
+  const missing=required.filter(k=>{
+    const hit=verifiedSpecs.some(s=>String(s.spec_key||'').toLowerCase().includes(k));
+    return !hit && /engine|cvt|drivetrain|brake|suspension|ev|electrical|chassis/.test(systems);
+  });
+  const impacts=[];
+  if(/engine|cvt|drivetrain/.test(systems)) impacts.push('drivetrain','thermal','fuel/electrical','brake/chassis');
+  if(/brake/.test(systems)) impacts.push('hydraulic','thermal','tire/chassis');
+  if(/suspension|chassis/.test(systems)) impacts.push('geometry','load','tire/brake');
+  if(/ev|electrical/.test(systems)) impacts.push('voltage','current','thermal','BMS/ECU');
+  if(!impacts.length) impacts.push('interface','load','thermal','validation');
+  const blockers=missing.length?missing.map(x=>'Missing verified evidence: '+x):[];
+  const status=blockers.length?'blocked':'requires_validation';
+  return {status,compatibility_status:status,vehicle_id:vehicle?.id||null,system:modification?.system||null,impacts:[...new Set(impacts)],required_evidence:required,verified_evidence_count:critical.length,blockers,ruleVersion:'compatibility-gate-v1',never_guess:true};
+};
 
 async function runLiveOemRetrieval(vehicle,{question='',sourceUrl='',maxPages=6}={}){
   if(!vehicle||!state?.sb) throw Error('Vehicle/Supabase belum siap');
