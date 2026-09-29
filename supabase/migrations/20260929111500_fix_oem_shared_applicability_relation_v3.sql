@@ -1,0 +1,69 @@
+-- Fix: shared OEM part evidence is derived from one part master with multiple documented applicability records.
+create or replace function public.get_vehicle_part_intelligence(
+  p_vehicle_id uuid,
+  p_query text default null,
+  p_part_number text default null,
+  p_component text default null
+) returns jsonb
+language plpgsql
+security invoker
+set search_path=public
+as $$
+declare
+  v public.vehicles%rowtype;
+  q text := lower(trim(coalesce(p_query,'')));
+  pn text := upper(regexp_replace(trim(coalesce(p_part_number,'')),'[^A-Z0-9]','','g'));
+  result jsonb;
+begin
+  select * into v from public.vehicles where id=p_vehicle_id and owner_id=auth.uid();
+  if not found then raise exception 'Vehicle tidak ditemukan atau bukan milik user'; end if;
+
+  with matches as (
+    select distinct p.id,p.manufacturer,p.part_number,p.part_name,p.component,p.assembly_group,
+      a.make,a.model,a.variant,a.year_from,a.year_to,a.market,a.vehicle_type,a.engine_code,a.transmission,
+      a.applicability_status,a.source_page,
+      case when pn<>'' and p.part_number_normalized=pn then 100
+           when lower(p.part_name) like '%'||q||'%' then 70
+           when lower(coalesce(p.component,'')) like '%'||q||'%' then 60 else 0 end match_score
+    from public.oem_parts p
+    join public.oem_part_applicability a on a.part_id=p.id
+    where a.applicability_status='documented'
+      and (a.make is null or lower(a.make)=lower(coalesce(v.brand,'')))
+      and (a.model is null or lower(a.model)=lower(coalesce(v.model,'')))
+      and (v.year is null or a.year_from is null or v.year>=a.year_from)
+      and (v.year is null or a.year_to is null or v.year<=a.year_to)
+      and (a.engine_code is null or lower(a.engine_code)=lower(coalesce(v.metadata->>'engine_code','')))
+      and ((pn='' and q='') or (pn<>'' and p.part_number_normalized=pn) or
+           (q<>'' and (lower(p.part_name) like '%'||q||'%' or lower(coalesce(p.component,'')) like '%'||q||'%')))
+      and (p_component is null or lower(coalesce(p.component,'')) like '%'||lower(p_component)||'%')
+    order by match_score desc,p.part_number limit 100
+  ),
+  relations as (
+    select 'shared_oem_part'::text relation_type,'verified'::text verification_status,1::numeric confidence,
+      'Exact same OEM part number is documented for both model applicability records.'::text reason,
+      p.part_number from_part_number,p.part_name from_part_name,p.part_number to_part_number,p.part_name to_part_name,
+      a1.model from_model,a1.variant from_variant,a1.year_from from_year,
+      a2.model to_model,a2.variant to_variant,a2.year_from to_year
+    from public.oem_parts p
+    join public.oem_part_applicability a1 on a1.part_id=p.id
+    join public.oem_part_applicability a2 on a2.part_id=p.id and a1.id<a2.id
+      and coalesce(a1.model,'')<>coalesce(a2.model,'')
+    where a1.applicability_status='documented' and a2.applicability_status='documented'
+      and (exists(select 1 from matches m where m.id=p.id) or (pn<>'' and p.part_number_normalized=pn))
+    limit 100
+  )
+  select jsonb_build_object(
+    'vehicle',jsonb_build_object('id',v.id,'make',v.brand,'model',v.model,'variant',v.variant,'year',v.year,
+      'vehicle_type',v.vehicle_type,'vin_or_frame',v.chassis_number,'engine_number',v.engine_number,
+      'engine_code',v.metadata->>'engine_code'),
+    'matches',coalesce((select jsonb_agg(to_jsonb(m) order by m.match_score desc) from matches m),'[]'::jsonb),
+    'relations',coalesce((select jsonb_agg(to_jsonb(r)) from relations r),'[]'::jsonb),
+    'rules',jsonb_build_object('exact_oem_part_number_is_strong_evidence',true,'same_family_is_not_compatibility',true,
+      'different_part_number_requires_fitment_evidence',true,'never_guess',true)
+  ) into result;
+  return result;
+end;
+$$;
+
+revoke all on function public.get_vehicle_part_intelligence(uuid,text,text,text) from public;
+grant execute on function public.get_vehicle_part_intelligence(uuid,text,text,text) to authenticated;
