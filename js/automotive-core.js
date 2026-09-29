@@ -505,13 +505,21 @@ async function runLiveOemRetrieval(vehicle,{question='',sourceUrl='',maxPages=6}
     const runInsert=await state.sb.from('oem_retrieval_runs').insert({vehicle_id:vehicle.id,requested_specs:[],source_policy:data.policy||{},status:'partial',sources:pages,extracted_claims:claims,errors:[],started_at:data.retrieved_at,completed_at:new Date().toISOString(),created_by:state.user?.id||null}).select('id').single();
     if(runInsert.error)console.warn('oem_retrieval_runs persist:',runInsert.error);
     for(const p of pages.filter(x=>x.finalUrl||x.url).slice(0,20)){
-      const src={source_type:'oem_web',title:String(p.finalUrl||p.url),publisher:vehicle.brand||vehicle.make,manufacturer:vehicle.brand||vehicle.make,model_scope:vehicle.model||null,engine_scope:vehicle.engine_code||null,revision:String(vehicle.year||''),url:p.finalUrl||p.url,document_ref:null,trust_level:'official_candidate',retrieved_at:data.retrieved_at,content_hash:null,metadata:{gateway_score:p.score||0,content_type:p.content_type||null,pdf:!!p.pdf}};
+      const isPdf=!!p.pdf||/pdf/i.test(String(p.content_type||''));
+      const src={source_type:isPdf?'oem_pdf':'oem_web',source_format:isPdf?'pdf':'web',title:String(p.finalUrl||p.url),publisher:vehicle.brand||vehicle.make,manufacturer:vehicle.brand||vehicle.make,model_scope:vehicle.model||null,engine_scope:vehicle.engine_code||null,revision:String(vehicle.year||''),url:p.finalUrl||p.url,document_ref:isPdf?String(p.finalUrl||p.url):null,trust_level:'official_candidate',retrieved_at:data.retrieved_at,content_hash:null,metadata:{gateway_score:p.score||0,content_type:p.content_type||null,pdf:isPdf,num_pages:p.num_pages||null,parse_quality:p.parse_quality||null}};
       const sr=await state.sb.from('technical_sources').insert(src).select('id').single();
       if(!sr.error&&sr.data?.id){
         const pc=claims.filter(x=>(x.source_url===p.finalUrl||x.source_url===p.url)).slice(0,100);
-        if(pc.length)await state.sb.from('technical_claims').insert(pc.map(x=>({source_id:sr.data.id,vehicle_id:vehicle.id,claim:String(x.field),value:{value:x.value,extraction:x.extraction,source_score:x.source_score},unit:null,applicability:{make:vehicle.brand||vehicle.make,model:vehicle.model,year:vehicle.year,variant:vehicle.variant,engine_code:vehicle.engine_code||null},confidence:Math.min(0.99,Math.max(0.1,(Number(x.source_score)||0)/100)),verification_status:'unverified',created_by:state.user?.id||null})));
+        if(pc.length) {
+          const cr=await state.sb.from('technical_claims').insert(pc.map(x=>({source_id:sr.data.id,vehicle_id:vehicle.id,claim:String(x.field),canonical_key:x.canonical_key||String(x.field||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),value:{value:x.value,extraction:x.extraction,source_score:x.source_score},unit:x.unit||null,raw_text:x.raw_text||null,source_page:Number(x.page)||null,source_format:x.source_format|| (isPdf?'pdf':'web'),applicability:{make:vehicle.brand||vehicle.make,model:vehicle.model,year:vehicle.year,variant:vehicle.variant,engine_code:vehicle.engine_code||null,vin:vehicle.vin||null},confidence:Math.min(0.99,Math.max(0.1,(Number(x.source_score)||0)/100)),verification_status:'unverified',created_by:state.user?.id||null})));
+          if(cr.error)console.warn('technical_claims persist:',cr.error);
+        }
       }
     }
+    try{
+      const rr=await state.sb.rpc('resolve_oem_claims',{p_vehicle_id:vehicle.id});
+      if(rr.error)console.warn('OEM normalization:',rr.error); else data.normalization=rr.data;
+    }catch(e){console.warn('OEM normalization:',e)}
   }catch(e){console.warn('OEM evidence persistence:',e)}
   return data;
 }
