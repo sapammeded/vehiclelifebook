@@ -113,16 +113,26 @@ async function queryParts({supabase,vehicle,query='',partNumber='',component=''}
 }
 
 function renderPartResults(data,escFn){
- const esc=escFn||((x)=>String(x??'')),matches=Array.isArray(data?.matches)?data.matches:[];
- if(!matches.length)return '<div class="empty">Belum ada part evidence yang cocok untuk kendaraan ini.</div>';
- return matches.map(p=>{
-  let h='<div class="card" style="box-shadow:none;margin-top:8px">';
+ const esc=escFn||((x)=>String(x??'')),matches=Array.isArray(data?.matches)?data.matches:[],relations=Array.isArray(data?.relations)?data.relations:[];
+ let h='';
+ if(!matches.length)h+='<div class="empty">Belum ada part evidence yang cocok untuk kendaraan ini.</div>';
+ matches.forEach(p=>{
+  h+='<div class="card" style="box-shadow:none;margin-top:8px">';
   h+='<div class="row between"><strong>'+esc(p.part_number)+'</strong><span class="badge success">OEM EVIDENCE</span></div>';
   h+='<div style="margin-top:5px">'+esc(p.part_name||'')+'</div>';
   h+='<div class="small muted" style="margin-top:5px">'+esc([p.make,p.model,p.variant,p.year_from&&p.year_to?String(p.year_from)+'–'+p.year_to:'',p.market].filter(Boolean).join(' · '))+'</div>';
-  if(p.source_url)h+='<div class="small" style="margin-top:6px"><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener">Source · page '+esc(p.source_page||'—')+'</a></div>';
-  return h+'</div>';
- }).join('');
+  h+='<div class="small" style="margin-top:6px">Source page: '+esc(p.source_page||'—')+' · applicability: '+esc(p.applicability_status||'documented')+'</div>';
+  h+='</div>';
+ });
+ if(relations.length){
+  h+='<div class="card" style="margin-top:10px;box-shadow:none;background:#f8fafc"><strong>🔗 OEM Part Interchange Evidence</strong>';
+  relations.forEach(r=>{
+    const verified=r.verification_status==='verified';
+    h+='<div class="card" style="margin-top:8px;box-shadow:none"><div><strong>'+esc(r.from_part_number)+'</strong> ↔ <strong>'+esc(r.to_part_number)+'</strong></div><div class="small muted" style="margin-top:4px">'+esc(r.relation_type)+' · '+esc(r.verification_status)+' · confidence '+esc(Math.round(Number(r.confidence||0)*100))+'%</div><div class="small" style="margin-top:4px">'+esc(r.reason||'')+'</div></div>';
+  });
+  h+='<div class="small muted" style="margin-top:8px">STATUS = shared_oem_part berarti nomor part OEM yang sama ditemukan pada applicability model berbeda. Ini evidence interchange OEM, bukan izin mengganti varian tanpa verifikasi fitment lengkap.</div></div>';
+ }
+ return h;
 }
 
 window.VehicleLifebookGlobal={version:'global-automotive-v1',classify,buildMission,buildPrompt,assessInterchange,queryParts,renderPartResults,normalizePartNumber:partNo};
