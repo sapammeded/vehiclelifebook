@@ -363,7 +363,7 @@ function renderApp(){
  ${v?vehicleSection(v):''}
  </main></div>`;
  $('#logout').onclick=()=>state.sb.auth.signOut();if($('#licenseBtn'))$('#licenseBtn').onclick=()=>openUpgradeModal('Masukkan Activation Code PRO Anda.');$('#addVehicle').onclick=()=>openVehicleModal();
- $('#ownerBtn').onclick=()=>openOwnerPanel();
+ if($('#ownerBtn'))$('#ownerBtn').onclick=()=>openOwnerPanel();
  $('#voiceBtn').onclick=()=>openVoiceModal();$('#expertBtn').onclick=()=>openExpertModal();$('#exportBtn').onclick=()=>openExportModal();if($('#ownerBtn'))$('#ownerBtn').onclick=()=>openOwnerModal();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
 }
