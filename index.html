@@ -523,7 +523,7 @@ function closeModal(m){m?.remove()}
 
 function openVehicleModal(){
  if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas paket saat ini tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
- const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div><button class="btn gray" type="button" id="voiceVehicle">🎙️ Isi data dengan Voice</button>
+ const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div>
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
  <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
@@ -560,7 +560,7 @@ function openEventModal(prefill={}){
   setBusy(true);try{
    const {data,error}=await state.sb.rpc('create_vehicle_event',{p_vehicle_id:state.selected,p_event_type:m.querySelector('#eType').value,p_event_date:m.querySelector('#eDate').value,p_title:title,p_description:m.querySelector('#eDesc').value.trim()||null,p_total_cost:cost,p_odometer:odo,p_source:prefill.source||'manual',p_raw_input:prefill.raw_input||null,p_metadata:{},p_detail:{}});
    if(error)throw error;
-   const eventId=data?.id||data?.event_id||data?.[0]?.id||data?.[0]?.event_id;
+   const eventId=(typeof data==='string'?data:null)||data?.id||data?.event_id||data?.[0]?.id||data?.[0]?.event_id;
    const files=Array.from(m.querySelector('#eventPhotosNew').files||[]);
    if(!eventId){toast('Aktivitas tersimpan, tetapi ID aktivitas tidak ditemukan untuk foto');closeModal(m);await loadVehicles();renderApp();return}
    let ok=0,fail=0;
