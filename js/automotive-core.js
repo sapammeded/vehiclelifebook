@@ -309,6 +309,74 @@ NS.health={
  }
 };
 
+
+// v2.3 Universal OEM Evidence + telemetry/maintenance context
+NS.oem={
+  criticalKeys:['displacement_cc','bore_mm','stroke_mm','compression_ratio','piston_diameter_mm','cylinder_bore_mm','connecting_rod_length_mm','rod_length_mm','deck_height_mm','ring_end_gap_mm','piston_to_wall_clearance_mm','valve_to_piston_clearance_mm','bearing_clearance_mm','cam_timing_deg','injector_flow','fuel_pressure','oil_pressure','service_interval_km','service_interval_months'],
+  isCritical(key){return this.criticalKeys.includes(String(key||'').toLowerCase())},
+  buildResearchPrompt(vehicle,missing=[]){
+    const v=vehicle||{};
+    const requested=missing.length?missing:this.criticalKeys;
+    return [
+      'VEHICLE LIFEBOOK — OEM VERIFIED SPECIFICATION RESEARCH',
+      'Identify the exact vehicle using make, model, year, variant, engine code and VIN when available.',
+      'RULES: OEM/manufacturer source first. Prefer official model specification, official service/manual, official parts catalogue, official VIN lookup, official TSB.',
+      'Use secondary sources only to cross-check; never promote them to OEM-verified without corroboration.',
+      'For every numeric claim return source URL, publisher, document title/revision, applicability, retrieval date and verification status.',
+      'NEVER GUESS. If a value cannot be verified from an authoritative source, return UNKNOWN.',
+      'Assembly-critical dimensions must be VERIFIED before being used as an assembly specification.',
+      'Do not confuse piston-pin diameter, ring diameter, bore, nominal piston diameter, or service limit.',
+      'Return strict JSON: vehicle_identity, specs[], missing_specs[], conflicts[], sources[].',
+      'vehicle_identity='+JSON.stringify({make:v.brand,model:v.model,year:v.year,variant:v.variant,engine_code:v.engine_code,vin:v.vin}),
+      'requested_specs='+JSON.stringify(requested)
+    ].join('\n');
+  }
+};
+
+NS.telemetry={
+  normalize({channel,value,unit,quality='valid',observedAt=new Date().toISOString(),rawValue=null}){
+    return {channel,value:Number(value),unit:unit||null,quality,observedAt,rawValue};
+  },
+  trend(samples){
+    const a=(samples||[]).filter(x=>Number.isFinite(Number(x.value))).map(x=>({t:new Date(x.observed_at||x.observedAt).getTime(),v:Number(x.value)})).sort((x,y)=>x.t-y.t);
+    if(a.length<2)return {status:'insufficient',slope:null,samples:a.length};
+    const dt=a[a.length-1].t-a[0].t;
+    return {status:'ok',slope:dt?round((a[a.length-1].v-a[0].v)/(dt/3600000),6):null,samples:a.length};
+  }
+};
+
+NS.maintenance.predictFromTelemetry=({rule,lastServiceOdometer,currentOdometer,intervalKm,telemetryTrend=null}={})=>{
+  const last=n(lastServiceOdometer), current=n(currentOdometer), interval=n(intervalKm);
+  if(!(interval>0))return {status:'unknown',reason:'interval_km_missing'};
+  const dueAt=last+interval, remaining=Math.max(0,dueAt-current);
+  return {status:remaining<=0?'due':remaining<=Math.max(500,interval*.1)?'due_soon':'ok',dueAtOdometer:dueAt,remainingKm:round(remaining,1),telemetryTrend};
+};
+
+NS.healthEngine={
+  score({reliability=100,maintenance=100,diagnostics=100,telemetry=100,evidence=100,safety=100}={}){
+    const score=round(n(reliability)*.22+n(maintenance)*.20+n(diagnostics)*.18+n(telemetry)*.12+n(evidence)*.10+n(safety)*.18,2);
+    const grade=score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'E';
+    return {score,grade,dimensions:{reliability,maintenance,diagnostics,telemetry,evidence,safety},methodVersion:'vehicle-health-v2'};
+  }
+};
+
+async function loadVehicleVerifiedSpecs(vehicle){
+  if(!vehicle||!state?.sb) return null;
+  const r=await state.sb.rpc('get_vehicle_spec_context',{p_vehicle_id:vehicle.id});
+  if(r.error)throw r.error;
+  return r.data;
+}
+NS.loadVehicleVerifiedSpecs=loadVehicleVerifiedSpecs;
+
+function buildAutoPrompt(vehicle,specContext,goal='modification/performance engineering'){
+  const specs=specContext?.specs||[];
+  return NS.oem.buildResearchPrompt(vehicle,[])+
+    '\nCURRENT_VERIFIED_CONTEXT='+JSON.stringify(specs)+
+    '\nGOAL='+goal+
+    '\nUse verified context first. If a required parameter is missing, stop that calculation and request/source it; do not infer it.';
+}
+NS.buildAutoPrompt=buildAutoPrompt;
+
 window.VehicleLifebookCore=NS;
 window.openExpertModal=openExpertModal;
 window.openInlineVoice=openInlineVoice;
