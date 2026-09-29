@@ -246,6 +246,46 @@ function openInlineVoice(targetId){
  try{r.start()}catch(e){toast0('Voice sedang aktif atau browser menolak akses mic.')}
 }
 
+
+NS.engineering={
+ thermalExpansionMm({lengthMm,alphaPerC,deltaTempC}){const L=n(lengthMm),a=n(alphaPerC),d=n(deltaTempC);if(!(L>0&&a>=0))throw Error('Length dan coefficient wajib valid');return round(L*a*d,6)},
+ operatingBoreMm({coldBoreMm,boreAlphaPerC,referenceTempC,operatingTempC}){return round(n(coldBoreMm)*(1+n(boreAlphaPerC)*(n(operatingTempC)-n(referenceTempC))),6)},
+ operatingPistonMm({coldPistonMm,pistonAlphaPerC,referenceTempC,operatingTempC}){return round(n(coldPistonMm)*(1+n(pistonAlphaPerC)*(n(operatingTempC)-n(referenceTempC))),6)},
+ pistonWallClearance({coldBoreMm,coldPistonMm,boreAlphaPerC,pistonAlphaPerC,referenceTempC,operatingTempC}){
+  const bore=NS.engineering.operatingBoreMm({coldBoreMm,boreAlphaPerC,referenceTempC,operatingTempC});
+  const piston=NS.engineering.operatingPistonMm({coldPistonMm,pistonAlphaPerC,referenceTempC,operatingTempC});
+  return {coldClearanceMm:round(n(coldBoreMm)-n(coldPistonMm),6),operatingBoreMm:bore,operatingPistonMm:piston,operatingClearanceMm:round(bore-piston,6),formulaVersion:'thermal-piston-wall-v1'};
+ },
+ ringEndGapAtTemp({coldGapMm,ringAlphaPerC,ringDiameterMm,referenceTempC,operatingTempC}){
+  const d=n(ringDiameterMm),a=n(ringAlphaPerC),dt=n(operatingTempC)-n(referenceTempC);
+  if(!(d>0&&a>=0))throw Error('Ring diameter/coefficient wajib valid');
+  return {thermalGrowthMm:round(Math.PI*d*a*dt,6),estimatedGapMm:round(n(coldGapMm)+Math.PI*d*a*dt,6),formulaVersion:'thermal-ring-gap-v1'};
+ },
+ deckHeight({blockDeckHeightMm,headGasketCompressedMm,pistonCompressionHeightMm,rodLengthMm,strokeMm,pistonAboveDeckMm=0}){
+  const v=n(blockDeckHeightMm)+n(headGasketCompressedMm)-(n(pistonCompressionHeightMm)+n(rodLengthMm)+n(strokeMm)/2);
+  return {theoreticalPistonToDeckMm:round(v,4),measuredCorrectionMm:n(pistonAboveDeckMm),formulaVersion:'deck-height-v1'};
+ },
+ pistonSpeed({strokeMm,rpm}){return NS.calc.meanPistonSpeed({strokeMm,rpm})},
+ rodRatio({rodLengthMm,strokeMm}){const r=n(rodLengthMm),s=n(strokeMm);if(!(r>0&&s>0))throw Error('Rod length/stroke wajib > 0');return round(r/s,4)},
+ bearingClearance({journalDiameterMm,bearingBoreDiameterMm}){const j=n(journalDiameterMm),b=n(bearingBoreDiameterMm);if(!(j>0&&b>0))throw Error('Journal/bearing bore wajib > 0');return {clearanceMm:round(b-j,5),clearanceMicron:round((b-j)*1000,1),formulaVersion:'bearing-clearance-v1'}},
+ valvePistonSafety({measuredClearanceMm,minimumRequiredMm}){const m=n(measuredClearanceMm),r=n(minimumRequiredMm);return {marginMm:round(m-r,4),status:m>=r?'pass':'fail',requiresOemSpec:true,formulaVersion:'valve-piston-v1'}}
+};
+NS.maintenance={
+ predict({currentKm,lastServiceKm,intervalKm,currentDate,lastServiceDate,intervalMonths}){
+  const kmLeft=intervalKm==null?null:n(intervalKm)-Math.max(0,n(currentKm)-n(lastServiceKm));
+  let monthsLeft=null;
+  if(intervalMonths!=null&&lastServiceDate&&currentDate){const a=new Date(lastServiceDate),b=new Date(currentDate);monthsLeft=n(intervalMonths)-((b.getUTCFullYear()-a.getUTCFullYear())*12+b.getUTCMonth()-a.getUTCMonth())}
+  return {kmRemaining:kmLeft,monthsRemaining:monthsLeft,due:(kmLeft!=null&&kmLeft<=0)||(monthsLeft!=null&&monthsLeft<=0),formulaVersion:'maintenance-interval-v1'};
+ }
+};
+NS.health={
+ score({reliability=100,maintenance=100,diagnostics=100,telemetry=100,evidence=100,safety=100}){
+  const d={reliability:clamp(n(reliability),0,100),maintenance:clamp(n(maintenance),0,100),diagnostics:clamp(n(diagnostics),0,100),telemetry:clamp(n(telemetry),0,100),evidence:clamp(n(evidence),0,100),safety:clamp(n(safety),0,100)};
+  const score=round(d.reliability*.22+d.maintenance*.20+d.diagnostics*.18+d.telemetry*.12+d.evidence*.10+d.safety*.18,2);
+  return {score,grade:score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'E',dimensions:d,methodVersion:'vehicle-health-v1'};
+ }
+};
+
 window.VehicleLifebookCore=NS;
 window.openExpertModal=openExpertModal;
 window.openInlineVoice=openInlineVoice;
