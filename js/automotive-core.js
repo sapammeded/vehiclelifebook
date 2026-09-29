@@ -263,7 +263,7 @@ async function openExpertModal(){
  <button class="card" id="hubMod" style="text-align:left"><strong>🔧 Modification Engineering</strong><div class="small muted">Compatibility, risk, baseline & test plan</div></button>
  <button class="card" id="hubValidation" style="text-align:left"><strong>✅ Validation Engine</strong><div class="small muted">Test result & acceptance record</div></button>
  <button class="card" id="hubEngineering" style="text-align:left"><strong>⚙️ Mechanical Engineering Lab</strong><div class="small muted">Clearance, thermal expansion, deck, ring & bearing calculations</div></button>
- <button class="card" id="hubExpertPrompt" style="text-align:left"><strong>🧠 Universal Expert Prompt</strong><div class="small muted">Pertanyaan bebas → kebutuhan data → OEM evidence → prompt engineering</div></button>
+ <button class="card" id="hubExpertPrompt" style="text-align:left"><strong>🧠 Universal Engineering Mission</strong><div class="small muted">Goal → OEM baseline → evidence → engineering → validation</div></button>
  </div>
  <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><strong>AI Context Pipeline</strong><div class="small" style="opacity:.75;margin-top:6px">Vehicle → Configuration → Components → Modifications → Evidence → Measurements → Diagnostics → Calculations → Validation. AI hanya menerima context terstruktur; critical math tetap deterministic.</div></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
@@ -278,43 +278,30 @@ async function openExpertModal(){
 }
 
 async function openUniversalExpertPrompt(vehicle){
- const m=modal(`<div class="row between"><div><h3>🧠 Universal Automotive Expert</h3><div class="small muted">Pertanyaan → data wajib → evidence OEM → prompt siap pakai</div></div><button class="btn gray" data-close>✕</button></div>
- <div class="field"><label>Pertanyaan / tujuan user *</label><textarea id="expertQuestion" rows="7" placeholder="Contoh: Honda BeAT 110 mau saya ubah menjadi 250 cc untuk race. Apa saja yang harus diubah dan bagaimana menghitungnya?"></textarea></div>
- <div class="two">
-  <div class="field"><label>Make</label><input id="expertMake" value="${esc0(vehicle.brand||vehicle.make||'')}"></div>
-  <div class="field"><label>Model</label><input id="expertModel" value="${esc0(vehicle.model||'')}"></div>
-  <div class="field"><label>Year</label><input id="expertYear" value="${esc0(vehicle.year||'')}"></div>
-  <div class="field"><label>Variant</label><input id="expertVariant" value="${esc0(vehicle.variant||'')}"></div>
-  <div class="field"><label>Engine Code</label><input id="expertEngine" value="${esc0(vehicle.engine_code||'')}"></div>
-  <div class="field"><label>VIN (opsional)</label><input id="expertVin" value="${esc0(vehicle.vin||'')}"></div>
- </div>
- <div class="row"><button class="btn primary" id="buildExpertPrompt">⚡ Analisis & Buat Prompt</button><button class="btn ghost" id="copyExpertPrompt">📋 Copy</button></div>
- <div id="expertAnalysis" class="card" style="margin-top:10px;box-shadow:none"></div>
- <textarea id="expertPromptOut" rows="18" style="width:100%;margin-top:10px;font-family:monospace" placeholder="Prompt akan muncul di sini..."></textarea>`);
- m.querySelector('[data-close]').onclick=()=>m.remove();
- let lastPrompt='';
+ const m=modal(`<div class="row between"><div><h3>🧠 Universal Engineering Mission</h3><div class="small muted">Goal → OEM baseline → evidence → engineering → validation</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="field"><label>Mission / tujuan *</label><textarea id="expertQuestion" rows="7" placeholder="Contoh: Honda BeAT standard 110 cc mau gue modif jadi 250 cc untuk race."></textarea></div>
+ <div class="two"><div class="field"><label>Make</label><input id="expertMake" value="${esc0(vehicle.brand||vehicle.make||'')}"></div>
+ <div class="field"><label>Model</label><input id="expertModel" value="${esc0(vehicle.model||'')}"></div>
+ <div class="field"><label>Year</label><input id="expertYear" value="${esc0(vehicle.year||'')}"></div>
+ <div class="field"><label>Variant</label><input id="expertVariant" value="${esc0(vehicle.variant||'')}"></div>
+ <div class="field"><label>Engine Code</label><input id="expertEngine" value="${esc0(vehicle.engine_code||'')}"></div>
+ <div class="field"><label>VIN</label><input id="expertVin" value="${esc0(vehicle.vin||'')}"></div></div>
+ <div class="row"><button class="btn primary" id="buildExpertPrompt">⚡ Build Mission</button><button class="btn ghost" id="copyExpertPrompt">📋 Copy</button></div>
+ <div id="expertAnalysis" class="card" style="margin-top:10px;box-shadow:none"></div><textarea id="expertPromptOut" rows="20" style="width:100%;margin-top:10px;font-family:monospace"></textarea>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove(); let lastPrompt='';
  m.querySelector('#buildExpertPrompt').onclick=async()=>{
-  try{
-   const q=m.querySelector('#expertQuestion').value.trim();if(!q)throw Error('Pertanyaan wajib diisi');
+  try{const q=m.querySelector('#expertQuestion').value.trim();if(!q)throw Error('Mission wajib diisi');
    const v={...vehicle,brand:m.querySelector('#expertMake').value.trim()||vehicle.brand,model:m.querySelector('#expertModel').value.trim()||vehicle.model,year:m.querySelector('#expertYear').value.trim()||vehicle.year,variant:m.querySelector('#expertVariant').value.trim()||vehicle.variant,engine_code:m.querySelector('#expertEngine').value.trim()||vehicle.engine_code,vin:m.querySelector('#expertVin').value.trim()||vehicle.vin};
-   let ctx=null;try{ctx=await loadVehicleVerifiedSpecs(v)}catch(e){ctx=null}
-   const a=NS.oem.classifyQuestion(q);
-   lastPrompt=NS.oem.buildExpertPrompt(v,q,ctx);
+   let ctx=null;try{ctx=await loadVehicleVerifiedSpecs(v)}catch(_){}
+   const mission=NS.oem.buildEngineeringMission(v,q,ctx);lastPrompt=NS.oem.buildEngineeringMissionPrompt(v,q,ctx);
    m.querySelector('#expertPromptOut').value=lastPrompt;
-   m.querySelector('#expertAnalysis').innerHTML='<strong>Research plan</strong><div class="small muted" style="margin-top:6px">Type: '+esc0(a.vehicleType)+' · Domain: '+esc0(a.domains.join(', '))+'</div><div class="small" style="margin-top:6px"><strong>Data yang wajib dicari:</strong> '+esc0(a.requestedSpecs.join(', ')||'baseline umum')+'</div><div class="small muted" style="margin-top:6px">Rule: OEM-first · critical data VERIFIED · konflik dilaporkan · UNKNOWN bila tidak terbukti.</div>';
-   try{
-    if(state?.sb?.from){
-     await state.sb.from('vehicle_spec_requests').insert({vehicle_id:v.id,requested_specs:a.requestedSpecs,source_policy:'official_first/critical_requires_verified/never_guess',generated_prompt:lastPrompt,status:'pending',created_by:state.user?.id||null});
-    }
-   }catch(_){}
-  }catch(e){toast0('Prompt gagal dibuat: '+e.message)}
+   const delta=mission.target.delta_cc==null?'UNKNOWN':((mission.target.delta_cc>=0?'+':'')+mission.target.delta_cc+' cc');
+   m.querySelector('#expertAnalysis').innerHTML='<strong>Engineering Mission siap</strong><div class="small" style="margin-top:6px">'+esc0(mission.identity.make||'UNKNOWN')+' '+esc0(mission.identity.model||'UNKNOWN')+' · target '+esc0(mission.target.target_cc??'UNKNOWN')+' cc · Δ '+esc0(delta)+'</div><div class="small muted" style="margin-top:6px">Evidence field: '+mission.requiredEvidence.length+' · critical UNKNOWN: '+mission.criticalUnknowns.length+'</div><div class="small muted" style="margin-top:6px">Gate: OEM baseline wajib dikunci sebelum kalkulasi/modifikasi.</div>';
+   try{if(state?.sb?.from&&v.id)await state.sb.from('vehicle_spec_requests').insert({vehicle_id:v.id,requested_specs:mission.requiredEvidence,source_policy:'official_first/critical_requires_verified/never_guess',generated_prompt:lastPrompt,status:'pending',created_by:state.user?.id||null});}catch(_){}
+  }catch(e){toast0('Mission gagal: '+e.message)}
  };
- m.querySelector('#copyExpertPrompt').onclick=async()=>{
-  if(!lastPrompt)return toast0('Buat prompt dulu');
-  try{await navigator.clipboard.writeText(lastPrompt);toast0('Prompt berhasil dicopy')}catch{m.querySelector('#expertPromptOut').select();document.execCommand('copy');toast0('Prompt berhasil dicopy')}
- };
+ m.querySelector('#copyExpertPrompt').onclick=async()=>{if(!lastPrompt)return toast0('Build Mission dulu');try{await navigator.clipboard.writeText(lastPrompt);toast0('Mission prompt berhasil dicopy')}catch{m.querySelector('#expertPromptOut').select();document.execCommand('copy');toast0('Mission prompt berhasil dicopy')}};
 }
-
 function openInlineVoice(targetId){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return toast0('Speech Recognition tidak tersedia di browser ini.');
  const r=new SR();r.lang='id-ID';r.interimResults=true;r.continuous=false;
@@ -434,6 +421,40 @@ NS.oem={
       'OUTPUT: vehicle_identity, question_analysis, verified_baseline, corroborated_data, unknown_data, conflicts, sources, calculations, modification_compatibility, risks, test_plan, validation_criteria, final_answer.',
       'Return concise evidence-backed reasoning; do not fabricate citations or URLs.'
     ].join('\n');
+  },
+  missionClassify(question=''){
+    const q=String(question||'').toLowerCase();
+    const cc=[...q.matchAll(/(\\d+(?:[.,]\\d+)?)\\s*cc\\b/gi)].map(x=>Number(x[1].replace(',','.')));
+    const tm=q.match(/(?:jadi|ke|menjadi|target|hingga|sampai)\\s*(\\d+(?:[.,]\\d+)?)\\s*cc\\b/i);
+    const target=tm?Number(tm[1].replace(',','.')):(cc.length>1?cc[cc.length-1]:null);
+    const domains=[];
+    const add=(d,re)=>{if(re.test(q)&&!domains.includes(d))domains.push(d)};
+    add('engine',/cc|bore|stroke|piston|seher|kruk|crank|rod|kompresi|compression|cam|noken|klep|valve|power|tenaga|torsi|torque/);
+    add('fuel',/injector|injektor|fuel|bensin|throttle|afr|lambda|ecu/);
+    add('cooling',/coolant|radiator|overheat|temperatur|thermostat|fan/);
+    add('lubrication',/oli|oil|bearing|tekanan oli/);
+    add('drivetrain',/cvt|roller|variator|belt|kopling|clutch|transmisi|gear|rasio/);
+    add('chassis',/rangka|frame|ban|tire|roda|wheel|chassis/);
+    add('brake',/rem|brake|abs|cakram|disc|kaliper|caliper/);
+    add('suspension',/suspensi|shock|fork|pegas/);
+    add('electrical',/aki|battery|alternator|wiring|fuse|voltage/);
+    add('ev_hybrid',/ev|bev|hybrid|baterai|inverter|bms|motor listrik/);
+    add('modification',/modif|modifikasi|upgrade|ubah|convert|konversi|swap|custom|build|racing|race/);
+    if(!domains.length)domains.push('engine');
+    return {domains,baselineCc:cc.length>1?cc[0]:null,targetCc:target,purpose:/drag/.test(q)?'drag':/race|racing|balap/.test(q)?'race':/endurance/.test(q)?'endurance':'unspecified',modificationRequested:/modif|modifikasi|upgrade|ubah|convert|konversi|swap|custom|build|racing|race/.test(q)};
+  },
+  buildEngineeringMission(vehicle,question,specContext){
+    const g=this.missionClassify(question), specs=specContext?.specs||[];
+    const required=[...new Set((g.domains||[]).flatMap(d=>this.domainMap[d]||[]))];
+    required.push('baseline_specs','target_configuration','compatibility','system_loads','thermal_limits','validation_limits');
+    const verified=new Set(specs.filter(x=>x.verification_status==='verified').map(x=>x.spec_key));
+    const criticalUnknowns=[...new Set(required.filter(k=>this.isCritical(k)&&!verified.has(k)))];
+    const identity={make:vehicle?.brand||vehicle?.make||null,model:vehicle?.model||null,year:vehicle?.year||null,variant:vehicle?.variant||null,engine_code:vehicle?.engine_code||vehicle?.engineCode||null,vin:vehicle?.vin||null};
+    return {version:'1.0.0',identity,goal:question,classification:g,target:{baseline_cc:g.baselineCc,target_cc:g.targetCc,delta_cc:g.baselineCc!=null&&g.targetCc!=null?g.targetCc-g.baselineCc:null,purpose:g.purpose},requiredEvidence:[...new Set(required)],criticalUnknowns,phases:['IDENTITY LOCK','OEM BASELINE','EVIDENCE RETRIEVAL','VERIFICATION','TARGET DEFINITION','ENGINEERING CALCULATION','COMPATIBILITY','RISK / FAILURE MODES','BUILD CONFIGURATION','TEST PLAN','ACCEPTANCE CRITERIA','VALIDATION'],sourcePolicy:{officialFirst:true,criticalRequiresVerified:true,neverGuess:true}};
+  },
+  buildEngineeringMissionPrompt(vehicle,question,specContext){
+    const mission=this.buildEngineeringMission(vehicle,question,specContext);
+    return ['VEHICLE LIFEBOOK — UNIVERSAL AUTOMOTIVE ENGINEERING MISSION v1','MISSION='+JSON.stringify(mission),'Do NOT jump directly to modification advice. First lock exact vehicle identity and establish the evidence-backed OEM baseline.','SOURCE ORDER: OEM official specification → OEM service/repair manual → OEM parts catalogue → OEM TSB/technical document → authorized technical documentation → reputable secondary cross-check.','Every technical/numeric claim must include source title, publisher, URL/document reference, revision/date when available, exact applicability, retrieval date and verification status.','NEVER GUESS. Missing or unverified critical inputs are UNKNOWN and block that calculation.','Separate OEM nominal, measured value, aftermarket component specification, service limit and modification target. Never average conflicting specifications.','Separate OEM BASELINE from TARGET/MODIFIED STATE. Calculate only from verified/measured inputs; show formulas, units, assumptions and provenance.','Check geometry/interfaces, loads, thermal, lubrication, fuel/air, ECU, electrical, drivetrain, brake, chassis and use-case implications.','Output: identity, OEM evidence matrix, verified baseline, unknowns/conflicts, target state, calculations, compatibility, system impacts, risks, build/measurement plan, test plan, acceptance criteria, validation and evidence-backed conclusion.','If evidence is insufficient, state UNKNOWN/NOT VERIFIED and specify exactly what evidence or measurement is required.'].join('\\n');
   },
   buildExpertPrompt(vehicle,question,specContext){
     const ctx=specContext||{}, specs=ctx.specs||[];
