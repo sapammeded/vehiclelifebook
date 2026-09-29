@@ -107,6 +107,27 @@ async function openTwin(vehicle){
  };
 }
 
+function openEngineeringLab(vehicle){
+ const m=modal(`<div class="row between"><div><h3>⚙️ Mechanical Engineering Lab</h3><div class="small muted">Thermal expansion, piston/block clearance, ring gap, deck & bearing clearance.</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="field"><label>Calculator</label><select id="engType">
+ <option value="pistonwall">Piston ↔ Cylinder Wall</option><option value="ringgap">Ring End Gap at Temperature</option><option value="deck">Piston-to-Deck</option><option value="bearing">Bearing Oil Clearance</option><option value="rod">Rod Ratio</option><option value="valve">Piston-to-Valve Safety</option></select></div>
+ <div id="engFields"></div><div class="small muted" style="margin-top:8px">⚠️ Coefficient/material dan minimum clearance harus berasal dari OEM/piston manufacturer bila tersedia. Tanpa spec tersebut hasil hanya engineering calculation, bukan assembly specification.</div>
+ <pre id="engResult" style="white-space:pre-wrap;margin-top:10px">Isi parameter.</pre><button class="btn primary" id="runEng" style="width:100%">Hitung & Simpan</button>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove();
+ const fs={
+ pistonwall:[['coldBoreMm','Cold bore (mm)'],['coldPistonMm','Cold piston (mm)'],['boreAlphaPerC','Bore α /°C'],['pistonAlphaPerC','Piston α /°C'],['referenceTempC','Reference °C'],['operatingTempC','Operating °C']],
+ ringgap:[['coldGapMm','Cold ring gap (mm)'],['ringAlphaPerC','Ring α /°C'],['ringDiameterMm','Ring diameter (mm)'],['referenceTempC','Reference °C'],['operatingTempC','Operating °C']],
+ deck:[['blockDeckHeightMm','Block deck height (mm)'],['headGasketCompressedMm','Compressed gasket (mm)'],['pistonCompressionHeightMm','Piston compression height (mm)'],['rodLengthMm','Rod length (mm)'],['strokeMm','Stroke (mm)'],['pistonAboveDeckMm','Measured piston above deck (mm)']],
+ bearing:[['journalDiameterMm','Journal diameter (mm)'],['bearingBoreDiameterMm','Bearing bore diameter (mm)']],
+ rod:[['rodLengthMm','Rod length (mm)'],['strokeMm','Stroke (mm)']],
+ valve:[['measuredClearanceMm','Measured clearance (mm)'],['minimumRequiredMm','OEM minimum (mm)']]
+ };
+ const funcs={pistonwall:'pistonWallClearance',ringgap:'ringEndGapAtTemp',deck:'deckHeight',bearing:'bearingClearance',rod:'rodRatio',valve:'valvePistonSafety'};
+ function render(){m.querySelector('#engFields').innerHTML='<div class="two">'+fs[m.querySelector('#engType').value].map(x=>'<div class="field"><label>'+x[1]+'</label><input id="e_'+x[0]+'" type="number" step="any"></div>').join('')+'</div>'}
+ m.querySelector('#engType').onchange=render;render();
+ m.querySelector('#runEng').onclick=async()=>{try{const type=m.querySelector('#engType').value,o={};fs[type].forEach(x=>o[x[0]]=Number(m.querySelector('#e_'+x[0]).value));const out=NS.engineering[funcs[type]](o);m.querySelector('#engResult').textContent=JSON.stringify(out,null,2);const s=await state.sb.from('vehicle_calculations').insert({vehicle_id:vehicle.id,calculation_type:'mechanical_'+type,formula_version:out.formulaVersion||'engineering-v1',inputs:o,outputs:out,assumptions:{requiresOemSpec:type==='valve'},deterministic:true,created_by:state.user.id});if(s.error)throw s.error;toast0('Engineering calculation tersimpan')}catch(e){m.querySelector('#engResult').textContent='ERROR: '+e.message}};
+}
+
 function openLab(vehicle){
  const m=modal(`<div class="row between"><div><h3>🧮 Engineering Calculation Engine</h3><div class="small muted">Perhitungan deterministik • formula versioned • bukan estimasi AI</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="field"><label>Calculation</label><select id="calcType">
@@ -227,6 +248,7 @@ async function openExpertModal(){
  <button class="card" id="hubEvidence" style="text-align:left"><strong>📚 Evidence Engine</strong><div class="small muted">Source, claim, confidence & verification</div></button>
  <button class="card" id="hubMod" style="text-align:left"><strong>🔧 Modification Engineering</strong><div class="small muted">Compatibility, risk, baseline & test plan</div></button>
  <button class="card" id="hubValidation" style="text-align:left"><strong>✅ Validation Engine</strong><div class="small muted">Test result & acceptance record</div></button>
+ <button class="card" id="hubEngineering" style="text-align:left"><strong>⚙️ Mechanical Engineering Lab</strong><div class="small muted">Clearance, thermal expansion, deck, ring & bearing calculations</div></button>
  </div>
  <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><strong>AI Context Pipeline</strong><div class="small" style="opacity:.75;margin-top:6px">Vehicle → Configuration → Components → Modifications → Evidence → Measurements → Diagnostics → Calculations → Validation. AI hanya menerima context terstruktur; critical math tetap deterministic.</div></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
@@ -236,6 +258,7 @@ async function openExpertModal(){
  m.querySelector('#hubEvidence').onclick=()=>{m.remove();openEvidence(v)};
  m.querySelector('#hubMod').onclick=()=>{m.remove();openModification(v)};
  m.querySelector('#hubValidation').onclick=()=>{m.remove();openValidation(v)};
+ m.querySelector('#hubEngineering').onclick=()=>{m.remove();openEngineeringLab(v)};
 }
 
 function openInlineVoice(targetId){
