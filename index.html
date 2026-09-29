@@ -61,7 +61,7 @@ const SUPABASE_URL='https://oeuyhfuohaizwuljgzeg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
 // Welcome media: upload your own file to this exact repo path. No code change needed.
 const WELCOME_VIDEO='assets/welcome.mp4';
-const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',license:null,maxVehicles:1,maxEvents:20};
+const state={sb:null,user:null,vehicles:[],selected:null,events:[],busy:false,voice:null,plan:'demo',configuredPlan:'demo',accessValid:true,accessState:'demo',license:null,licenseStatus:null,licenseExpiresAt:null,maxVehicles:1,maxEvents:20};
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -334,7 +334,7 @@ async function resetPassword(){
 }
 
 async function afterLogin(){await loadEntitlement();await loadVehicles();renderApp()}
-async function loadEntitlement(){try{const {data,error}=await state.sb.rpc('get_my_entitlement');if(error)throw error;state.plan=data?.plan||'demo';state.license=data?.license_id||null;state.maxVehicles=Number(data?.max_vehicles||1);state.maxEvents=Number(data?.max_events||20)}catch(e){state.plan='demo';state.maxVehicles=1;state.maxEvents=20}}
+async function loadEntitlement(){try{const {data,error}=await state.sb.rpc('get_my_entitlement');if(error)throw error;state.plan=data?.plan||'demo';state.configuredPlan=data?.configured_plan||state.plan;state.accessValid=data?.access_valid!==false;state.accessState=data?.access_state||state.plan;state.license=data?.license_id||null;state.licenseStatus=data?.license_status||null;state.licenseExpiresAt=data?.expires_at||null;state.maxVehicles=Number(data?.max_vehicles||1);state.maxEvents=Number(data?.max_events||20)}catch(e){state.plan='demo';state.configuredPlan='demo';state.accessValid=false;state.accessState='invalid';state.license=null;state.licenseStatus=null;state.licenseExpiresAt=null;state.maxVehicles=1;state.maxEvents=20}}
 async function loadVehicles(){
  const {data,error}=await state.sb.from('vehicles').select('*').order('plate_number');
  if(error){toast(error.message);return}state.vehicles=data||[];
@@ -349,7 +349,7 @@ async function loadEvents(){
 
 function renderApp(){
  const v=state.vehicles.find(x=>x.id===state.selected);
- $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>${state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO'}</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span>${state.plan!=='owner'?'<button class="btn primary" id="licenseBtn">💎 UBAH KE PRO</button>':''}<button class="btn gray" id="logout">Keluar</button></div></div></header>
+ $('#app').innerHTML=`<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>${state.plan==='owner'?'OWNER':state.plan==='pro'?'PRO':'DEMO'} · ${state.plan==='pro'?'LICENSE AKTIF':state.plan==='owner'?'FULL ACCESS':'1 KENDARAAN / 20 AKTIVITAS'}</small></div><div class="row"><span class="small muted">${esc(state.user?.email||'')}</span>${state.plan!=='owner'?'<button class="btn primary" id="licenseBtn">${state.plan==='pro'?'⚙️ LICENSE PRO':'💎 UBAH KE PRO'}</button>':''}<button class="btn gray" id="logout">Keluar</button></div></div></header>
  <main class="wrap">
  <section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>
  <div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert ${state.plan==='pro'||state.plan==='owner'?'PRO':''}</button><button class="tab" id="exportBtn">Export</button>${state.plan==='owner'?'<button class="tab" id="ownerBtn">👑 Owner</button>':''}</div>
@@ -383,7 +383,7 @@ function modal(inner){
 function closeModal(m){m?.remove()}
 
 function openVehicleModal(){
- if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas DEMO tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
+ if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas paket saat ini tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
  const m=modal(`<div class="row between"><h3>Tambah kendaraan</h3><button class="btn gray" data-close>✕</button></div><button class="btn gray" type="button" id="voiceVehicle">🎙️ Isi data dengan Voice</button>
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
@@ -400,7 +400,7 @@ function openVehicleModal(){
 }
 
 function openEventModal(prefill={}){
- if(state.plan!=='owner' && state.events.length>=state.maxEvents){openUpgradeModal('Batas aktivitas DEMO tercapai. Aktifkan PRO untuk mencatat tanpa batas.');return}
+ if(state.plan!=='owner' && state.events.length>=state.maxEvents){openUpgradeModal('Batas aktivitas paket saat ini tercapai. Aktifkan PRO untuk mencatat lebih banyak aktivitas.');return}
  const v=state.vehicles.find(x=>x.id===state.selected);
  if(!v){toast('Tambahkan kendaraan dulu');return}
  const m=modal(`<div class="row between"><h3>Tambah aktivitas</h3><button class="btn gray" data-close>✕</button></div>
@@ -522,13 +522,19 @@ function makeLicenseCode(){
  return 'VL-PRO-'+part()+'-'+part();
 }
 
-function openUpgradeModal(msg){
- const m=modal(`<div class="row between"><div><h3 style="margin:0">Vehicle Lifebook PRO</h3><div class="small muted">Unlock full vehicle intelligence</div></div><button class="btn gray" data-close>✕</button></div>
- <div class="pro card" style="margin-top:12px"><strong>${esc(msg)}</strong><div class="small" style="margin-top:6px;opacity:.9">PRO membuka kendaraan & aktivitas tanpa batas, Automotive Expert, export PRO, voice dan fitur lanjutan.</div></div>
- <div class="field" style="margin-top:14px"><label>Activation Code</label><input id="licenseCode" placeholder="VL-PRO-XXXX-XXXX"></div>
- <button class="btn primary" style="width:100%" id="activateLicense">Aktifkan PRO</button>`);
+function openUpgradeModal(msg=''){
+ const isPro=state.plan==='pro';
+ const expiry=state.licenseExpiresAt?new Date(state.licenseExpiresAt).toLocaleDateString('id-ID'):'Tidak kedaluwarsa';
+ const currentLicense=state.license?String(state.license):'Belum ada license';
+ const currentLabel=isPro?'PRO AKTIF':'DEMO';
+ const m=modal(`<div class="row between"><div><h3 style="margin:0">Vehicle Lifebook PRO</h3><div class="small muted">Status paket & aktivasi license</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="pro card" style="margin-top:12px"><div class="row between"><strong>${currentLabel}</strong><span class="badge">${isPro?'LICENSE VALID':'UPGRADE'}</span></div><div class="small" style="margin-top:7px;opacity:.9">${esc(msg||'Aktifkan license PRO untuk membuka seluruh fitur Vehicle Lifebook.')}</div><div class="small" style="margin-top:9px;opacity:.9">Limit saat ini: ${state.maxVehicles.toLocaleString('id-ID')} kendaraan · ${state.maxEvents.toLocaleString('id-ID')} aktivitas.</div>${isPro?'<div class="small" style="margin-top:5px;opacity:.9">License: '+esc(currentLicense.slice(-8))+' · Berlaku sampai: '+esc(expiry)+'</div>':''}</div>
+ ${isPro?'':'<div class="field" style="margin-top:14px"><label>Activation Code PRO</label><input id="licenseCode" autocomplete="off" placeholder="VL-PRO-XXXX-XXXX"></div><button class="btn primary" style="width:100%" id="activateLicense">Aktifkan PRO</button>'}
+ <button class="btn gray" style="width:100%;margin-top:9px" id="refreshEntitlement">↻ Refresh Status License</button>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
- m.querySelector('#activateLicense').onclick=async()=>{const code=m.querySelector('#licenseCode').value.trim();if(!code){toast('Masukkan Activation Code');return}setBusy(true);try{const {data,error}=await state.sb.rpc('activate_license',{p_code:code});if(error)throw error;state.plan='pro';state.license=data?.license_id||code;state.maxVehicles=Number(data?.max_vehicles||999999);state.maxEvents=Number(data?.max_events||999999);closeModal(m);renderApp();toast('PRO berhasil diaktifkan')}catch(e){toast(e.message||'Activation gagal')}finally{setBusy(false)}};
+ m.querySelector('#refreshEntitlement').onclick=async()=>{setBusy(true);try{await loadEntitlement();closeModal(m);renderApp();toast('Status license diperbarui')}finally{setBusy(false)}};
+ const activate=m.querySelector('#activateLicense');
+ if(activate)activate.onclick=async()=>{const code=m.querySelector('#licenseCode').value.trim().toUpperCase();if(!code){toast('Masukkan Activation Code PRO');return}setBusy(true);try{const {data,error}=await state.sb.rpc('activate_license',{p_code:code});if(error)throw error;await loadEntitlement();await loadVehicles();closeModal(m);renderApp();toast('✅ PRO berhasil diaktifkan')}catch(e){const msg=String(e?.message||e||'Activation gagal').replace(/^.*?: /,'');toast(msg)}finally{setBusy(false)}};
 }
 
 function openExportModal(){
