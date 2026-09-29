@@ -391,7 +391,19 @@ async function resetPassword(){
  toast(error?error.message:'Link reset dikirim jika email terdaftar.');
 }
 
-async function afterLogin(){await loadEntitlement();await loadVehicles();await loadStorageUsage();renderApp()}
+async function afterLogin(){
+ try{
+  const {error}=await state.sb.rpc('ensure_vehicle_profile');
+  if(error)throw error;
+ }catch(e){
+  toast('Gagal menyiapkan profil akun: '+(e.message||e));
+  return;
+ }
+ await loadEntitlement();
+ await loadVehicles();
+ await loadStorageUsage();
+ renderApp();
+}
 async function loadEntitlement(){try{const {data,error}=await state.sb.rpc('get_my_entitlement');if(error)throw error;state.plan=data?.plan||'demo';state.configuredPlan=data?.configured_plan||state.plan;state.accessValid=data?.access_valid!==false;state.accessState=data?.access_state||state.plan;state.license=data?.license_id||null;state.licenseStatus=data?.license_status||null;state.licenseExpiresAt=data?.expires_at||null;state.maxVehicles=Number(data?.max_vehicles||1);state.maxEvents=Number(data?.max_events||20)}catch(e){state.plan='demo';state.configuredPlan='demo';state.accessValid=false;state.accessState='invalid';state.license=null;state.licenseStatus=null;state.licenseExpiresAt=null;state.maxVehicles=1;state.maxEvents=20}}
 async function loadStorageUsage(){
  try{
