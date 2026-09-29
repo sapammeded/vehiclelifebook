@@ -421,7 +421,12 @@ async function auth(mode){
   if(r.error)throw r.error;
   toast(mode==='login'?'Berhasil masuk.':'Akun dibuat. Jika email confirmation aktif, cek email Anda.');
   if(mode==='signup'&&!r.data.session)toast('Cek email untuk konfirmasi akun.');
- }catch(e){toast(e.message||'Autentikasi gagal')}finally{setBusy(false)}
+ }catch(e){
+   const msg=String(e?.message||'Autentikasi gagal');
+   if(/rate limit|email rate limit|too many requests/i.test(msg)){
+     toast('Limit email Supabase tercapai. Tunggu reset limit atau gunakan SMTP sendiri di Supabase Auth.');
+   }else toast(msg);
+ }finally{setBusy(false)}
 }
 async function resetPassword(){
  const email=$('#email').value.trim();if(!email){toast('Isi email dulu');return}
