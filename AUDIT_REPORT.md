@@ -1,167 +1,164 @@
-# Vehicle Lifebook — Audit & Upgrade Report
+# Vehicle Lifebook — Production Audit & Upgrade Report
 
-Audit basis: repository source on `main`, Supabase production schema/functions, and the supplied AI Audit & Upgrade Command Pack.
+Audit date: 2026-09-29  
+Repository: `sapammeded/vehiclelifebook`  
+Scope: frontend, GitHub Pages pipeline, Supabase production schema/RLS/RPCs, Storage, OEM intelligence, activity/media lifecycle.
 
-## 1. Source inventory
+## Executive result
 
-Actual repository currently contains:
-- `index.html`: the application entry point and almost all frontend logic/UI.
-- `README.md`: production documentation.
-- `.github/workflows/pages.yml`: GitHub Pages deployment.
-- `scripts/validate-index.mjs`: deployment-time JavaScript/security validation.
-- No separate frontend modules, backend source tree, Edge Functions, tests, or committed migration files were found in the repository.
+The application is a working mobile-first single-page Vehicle Lifebook with Supabase Auth, vehicle/event history, media evidence, license/entitlement controls and an OEM evidence layer.
 
-Supabase is the actual backend and contains the vehicle/event/detail/media/audit/profile/license domains plus views and RPCs.
+The audit found that the core safety/security model is already substantially hardened, but several production gaps remained. This audit pass fixed the storage-accounting weakness and improved the dashboard's storage visibility without rewriting the application.
 
-## 2. P0/P1 findings fixed
+## Verified architecture
 
-### P0 — Fatal frontend parse failure
-The previous `renderApp()` used nested template literals inside a larger template literal. That made the browser fail parsing the inline JavaScript before `boot()` could run, producing a blank page.
+- `index.html` remains the main UI/application shell.
+- `js/automotive-core.js` contains the automotive domain core.
+- `js/global-automotive-intelligence.js` contains the vehicle-agnostic OEM/evidence mission layer.
+- Supabase owns Auth, RLS, vehicle/event/detail/media data, entitlement/license logic, OEM evidence and the storage metadata model.
+- GitHub Pages validates JavaScript before deployment and does not deploy pull-request builds.
 
-Status: FIXED.
-Validation: full inline script passed `new Function(...)` syntax validation.
+## Findings and status
 
-### P1 — Package limits were only a frontend guard
-Vehicle/event limits were previously checked in JavaScript, which is not an authorization boundary.
+### P0 — Frontend parse failure
+**Status: FIXED**
 
-Status: FIXED in PostgreSQL.
-- DEMO: 1 vehicle / 20 events.
-- PRO: active, non-expired license limits.
-- OWNER: effectively unrestricted.
-- Expired/revoked PRO fails closed to DEMO limits.
-- Vehicle owner and event creator are verified server-side.
-- Concurrent inserts lock the user's profile row before counting.
-- Case-insensitive per-owner plate uniqueness was added.
-- Useful indexes were added for event counting/timeline access.
+The previous nested-template-literal issue was corrected. The repository contains a JavaScript validation gate that parses every inline and local JavaScript file before Pages deployment.
 
-### P1 — Deployment could publish broken JavaScript
-GitHub Pages previously deployed without a syntax gate.
+### P1 — Entitlement limits only enforced in frontend
+**Status: FIXED**
 
-Status: FIXED.
-The workflow now validates inline JavaScript and rejects potential service-role secrets before deployment.
+Vehicle and event limits are enforced server-side through Supabase. The effective entitlement fails closed to DEMO when a PRO license is expired/revoked/invalid.
 
-### P2 — Missing welcome video asset had no graceful fallback
-The source references `assets/welcome.mp4`, but that asset was not present in the repository inventory.
+### P1 — Cross-user data access
+**Status: FIXED / VERIFIED**
 
-Status: FIXED at UX level.
-A failed video load now falls back to a branded visual instead of leaving a broken media area.
+RLS policies constrain vehicles, events, media and typed event-detail tables to the authenticated owner/event creator. Event creation also verifies vehicle ownership server-side.
 
-## 3. Current architecture findings
+### P1 — Storage quota trusted client-supplied file size
+**Status: FIXED IN THIS AUDIT**
 
-The application is functional as a small mobile-first single-file app, but the frontend is currently a monolith.
+The previous media quota trigger summed `vehicle_media.file_size`, which was supplied by the client. That value was not an authoritative measurement of the actual Storage object.
 
-Important architectural debt:
-- UI, state, Supabase access, entitlement logic, voice parsing, export, expert prompt construction, owner console and modal code live in one HTML file.
-- There are duplicated owner-license UI paths/functions.
-- Automotive Expert is currently a prompt-generation feature, not a real model/tool execution pipeline.
-- No deterministic calculation engine is present.
-- No evidence/knowledge retrieval engine is present.
-- No structured diagnostic engine is present.
-- No explicit validation-history model for AI conclusions is present.
-- Vehicle schema already contains useful identity fields, but a full digital-twin/component/configuration model is not yet implemented.
-- Media/detail database domains exist, but the current UI does not expose their full capability.
+New migration:
+`20260929184000_media_quota_authoritative_storage_v2.sql`
 
-## 4. Automotive intelligence gap
+The quota guard now:
+1. requires an authenticated owner;
+2. verifies the Storage object exists in `vehicle-evidence`;
+3. verifies the object owner;
+4. reads the authoritative Storage `metadata->>'size'`;
+5. overwrites `vehicle_media.file_size` with the actual size;
+6. counts the user's actual Storage objects toward quota, including orphaned objects;
+7. applies the same quota to DEMO/PRO/OWNER;
+8. locks the user's profile row during the quota decision.
 
-The prompt core is strong as an instruction set, but the source does not yet prove the existence of:
-- OEM/manual evidence retrieval.
-- source citations attached to technical claims.
-- structured diagnostic decision trees.
-- deterministic engineering calculators.
-- compatibility verification against actual parts/specifications.
-- calculation/test/validation records linked to vehicle history.
-- confidence/evidence state per technical fact.
+An index on `vehicle_media(uploaded_by)` was also added.
 
-These must be treated as missing, not assumed to exist.
+### P2 — Storage visibility
+**Status: IMPROVED IN THIS AUDIT**
 
-## 5. Data foundation
+The dashboard now shows:
+- used storage;
+- quota;
+- remaining storage;
+- percentage used;
+- warning state at 80% and 90%.
 
-The existing Supabase model is a strong starting point:
-vehicles → vehicle_events → typed detail tables, plus media and event audit.
+The UI wording correctly treats photo count as unlimited per activity only within the account's storage quota.
 
-The next data-model layer should add structured:
-- vehicle configuration/current state
-- component relationships
-- modifications
-- evidence records
-- measurements/tests
-- diagnostic cases
-- calculations
-- validation results
+### P2 — Activity lifecycle
+**Status: IMPLEMENTED**
 
-These should be added incrementally through repeatable migrations; existing history must not be rewritten destructively.
+Existing activities can be:
+- edited;
+- deleted;
+- searched;
+- assigned multiple photos;
+- have individual photos deleted;
+- receive additional photos later.
 
-## 6. Security
+Deleting an activity removes its Storage objects first and then deletes the event so database history and Storage metadata do not intentionally diverge.
 
-Positive:
-- RLS is enabled on the application tables.
-- Service-role key is not present in the frontend.
-- License/profile access is constrained.
-- SECURITY DEFINER RPC exposure was hardened.
-- Package limits are now enforced server-side.
+### P2 — Typed activity detail forms
+**Status: PARTIAL / NEXT**
 
-Remaining:
-- SECURITY DEFINER functions should continue to be reviewed whenever changed.
-- File/media upload policy and storage bucket rules require a separate storage-specific audit because repository source alone does not expose bucket configuration.
-- Supabase leaked-password protection remains a Free-plan platform limitation and is not a source-code defect.
+The database already supports dedicated detail tables for fuel, service/items, damage, part, inspection and expense. The current basic activity UI persists the core timeline fields and the server RPC supports structured detail payloads, but the current UI does not yet expose every typed detail field for full create/edit workflows.
 
-## 7. UX/mobile
+This is the next major UX/data-quality upgrade.
 
-Current app is responsive and mobile-first, with voice fallback and modal workflows.
+### P2 — Automotive intelligence
+**Status: PARTIAL / ACTIVE FOUNDATION**
 
-Remaining improvements:
-- split the monolithic UI into modules without changing behavior;
-- add explicit loading/error/offline states;
-- improve media/photo workflows;
-- add structured detail forms for fuel/service/damage/parts/inspection;
-- preserve touch-friendly controls and low-end Android performance.
+The repository has:
+- vehicle-agnostic mission classification;
+- OEM-first evidence rules;
+- explicit FACT/VERIFIED/CORROBORATED/CANDIDATE/UNKNOWN/CONFLICT states in the prompt contract;
+- OEM part applicability/interchange query support;
+- deterministic compatibility gates;
+- Supabase evidence/source/measurement/calculation/validation tables.
 
-## 8. Performance
+The AI layer is still an evidence/reasoning orchestration foundation, not a fully autonomous OEM knowledge corpus for every vehicle on the market. Unknown technical data must remain UNKNOWN until sourced.
 
-The largest current maintainability/performance risks are:
-- one large HTML/JavaScript bundle;
-- several CDN dependencies loaded up front;
-- XLSX/PDF libraries loaded even when export is unused;
-- the large automotive prompt stored in the initial page;
-- no lazy module loading.
+### P2 — Frontend monolith
+**Status: OPEN**
 
-A future modular build should lazy-load heavy export and expert functionality.
+The app is still heavily concentrated in `index.html`. Incremental extraction into modules is recommended, but a full rewrite should not be performed because the current application is functional.
 
-## 9. Owner upgrade order
+### P2 — Heavy initial dependencies
+**Status: OPEN**
 
-1. Keep the current stabilization and server-side security fixes.
-2. Establish structured vehicle digital-twin/configuration data.
-3. Add evidence + source tracking.
-4. Add deterministic calculation engine.
-5. Add diagnostic workflow with evidence/test/validation states.
-6. Turn Automotive Expert into a context/evidence/reasoning pipeline.
-7. Add modification/performance engineering workflows.
-8. Add validation and safety gates.
-9. Modularize the frontend and optimize mobile performance.
-10. Production hardening, observability and broader automated tests.
+XLSX, PDF, DOCX and AutoTable libraries are loaded up front. Lazy loading should be introduced when the app grows further to improve low-end Android startup performance.
 
-## 10. Acceptance tests
+### P2 — Storage orphan cleanup
+**Status: OPEN**
 
-- Unauthenticated user cannot reach protected vehicle data.
-- DEMO cannot create vehicle #2.
-- DEMO cannot create event #21.
-- Expired/revoked PRO is treated as DEMO.
-- Valid PRO uses its license limits.
-- OWNER remains unrestricted.
-- Cross-user vehicle/event creation is rejected.
-- Duplicate plate for the same owner is rejected case-insensitively.
-- Existing vehicle history remains unchanged by entitlement changes.
-- Broken welcome media does not break the login screen.
-- A JavaScript syntax error cannot be deployed by the Pages workflow.
-- Frontend contains no service-role secret.
-- Existing voice preview still requires confirmation before persistence.
+The quota now counts orphaned Storage objects, which prevents quota bypass. A future owner/admin maintenance workflow should identify and safely remove orphaned objects through the Storage API.
 
-## 11. UNKNOWN / requires additional platform evidence
+### Security Advisor warnings
+**Status: REVIEWED**
 
-- Exact Supabase Storage bucket policies.
-- Production Auth provider configuration beyond what is visible through the connected project.
-- Real-device performance measurements on the user's Android handset.
-- Actual OEM technical source corpus for each vehicle model.
-- Any future AI provider/tool integration not currently present in repository source.
+Supabase reports four SECURITY DEFINER functions callable by authenticated users:
+- `activate_license`
+- `ensure_vehicle_profile`
+- `get_my_entitlement`
+- `owner_grant_license`
 
-No unsupported assumptions were used for these items.
+These are intentional RPC entry points. `owner_grant_license` checks `vehicle_profiles.plan='owner'` before issuing a license. They should continue to be reviewed whenever their implementation changes.
+
+Supabase also reports leaked-password protection disabled. This is an Auth platform configuration item, not a frontend secret/code defect.
+
+## Production acceptance checklist
+
+- [x] RLS enabled on application tables.
+- [x] Frontend contains no service-role key.
+- [x] Server-side vehicle/event entitlement limits.
+- [x] Case-insensitive owner plate uniqueness.
+- [x] Activity edit/delete.
+- [x] Multi-photo activity evidence.
+- [x] Individual photo deletion/addition.
+- [x] Storage quota enforcement.
+- [x] Storage quota now based on actual Storage object size.
+- [x] Dashboard storage usage visibility.
+- [x] GitHub Pages JavaScript syntax gate.
+- [x] Pull-request deployment is blocked.
+- [ ] Full typed detail create/edit UX.
+- [ ] Automated browser/device integration tests.
+- [ ] Lazy loading of heavy export libraries.
+- [ ] Storage orphan maintenance workflow.
+- [ ] Full OEM source corpus coverage by make/model/market.
+
+## Next engineering order
+
+1. Complete typed activity detail create/edit.
+2. Add deterministic calculation records and validation UI.
+3. Connect OEM retrieval results directly to saved evidence records.
+4. Add structured vehicle configuration/component/modification UI.
+5. Add diagnostic case → measurement → test → validation workflow.
+6. Add automated browser smoke tests.
+7. Modularize the frontend incrementally.
+8. Add production observability and storage maintenance.
+
+## Important limitation
+
+A GitHub source audit can verify repository code and connected Supabase schema/RPC configuration. It cannot prove real-device Android behavior, every OEM specification, or a live Pages deployment unless the corresponding runtime/test evidence is observed.
