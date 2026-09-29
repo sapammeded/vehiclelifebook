@@ -162,6 +162,61 @@ async function openEvidence(vehicle){
  m.querySelector('#saveEvidence').onclick=async()=>{try{const title=m.querySelector('#evTitle').value.trim(),claim=m.querySelector('#evClaim').value.trim();if(!title||!claim)throw Error('Judul dan claim wajib');const s=await state.sb.from('evidence_sources').insert({owner_id:state.user.id,source_type:m.querySelector('#evType').value,title,trust_level:m.querySelector('#evTrust').value,url:m.querySelector('#evRef').value.trim()||null}).select().single();if(s.error)throw s.error;const e=await state.sb.from('vehicle_evidence').insert({vehicle_id:vehicle.id,source_id:s.data.id,claim,observation:m.querySelector('#evObs').value.trim()||null,confidence:clamp(Number(m.querySelector('#evConf').value),0,1),created_by:state.user.id});if(e.error)throw e.error;toast0('Evidence tersimpan');m.remove()}catch(e){toast0('Gagal simpan evidence: '+e.message)}};
 }
 
+
+async function openModification(vehicle){
+ const m=modal(`<div class="row between"><div><h3>🔧 Modification Engineering</h3><div class="small muted">Compatibility → calculation → test → validation</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="two">
+  <div class="field"><label>System *</label><input id="modSystem" placeholder="Engine / CVT / Brake / Suspension / EV"></div>
+  <div class="field"><label>Modification *</label><input id="modTitle" placeholder="Contoh: upgrade brake pad"></div>
+  <div class="field"><label>Type</label><select id="modType"><option>performance</option><option>reliability</option><option>comfort</option><option>restoration</option><option>other</option></select></div>
+  <div class="field"><label>Risk</label><select id="modRisk"><option>unknown</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></div>
+ </div>
+ <div class="field"><label>Target effect</label><textarea id="modTarget" placeholder="Apa yang ingin dicapai?"></textarea></div>
+ <div class="field"><label>Baseline JSON</label><textarea id="modBase">{}</textarea></div>
+ <div class="field"><label>Test plan</label><textarea id="modTest" placeholder="Parameter, kondisi, acceptance criteria..."></textarea></div>
+ <div class="small muted">Status compatibility tetap UNKNOWN sampai interface, dimension, load, electrical/thermal compatibility dan evidence diverifikasi.</div>
+ <button class="btn primary" style="width:100%;margin-top:10px" id="saveMod">Simpan Modification Record</button>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove();
+ m.querySelector('#saveMod').onclick=async()=>{
+  try{
+   const system=m.querySelector('#modSystem').value.trim(),title=m.querySelector('#modTitle').value.trim();if(!system||!title)throw Error('System dan nama modifikasi wajib');
+   let baseline={};try{baseline=JSON.parse(m.querySelector('#modBase').value||'{}')}catch{throw Error('Baseline JSON tidak valid')}
+   const r=await state.sb.from('vehicle_modifications').insert({vehicle_id:vehicle.id,system,title,modification_type:m.querySelector('#modType').value,risk_level:m.querySelector('#modRisk').value,target_effect:m.querySelector('#modTarget').value.trim()||null,baseline,test_plan:m.querySelector('#modTest').value.trim()||null,compatibility_status:'unknown',validation_status:'not_tested'}).select().single();
+   if(r.error)throw r.error;toast0('Modification record tersimpan');m.remove();
+  }catch(e){toast0('Gagal simpan modification: '+e.message)}
+ };
+}
+
+async function openValidation(vehicle){
+ const mods=await state.sb.from('vehicle_modifications').select('id,title,system,validation_status,compatibility_status,risk_level').eq('vehicle_id',vehicle.id).order('created_at',{ascending:false});
+ if(mods.error)throw mods.error;
+ const cases=await state.sb.from('diagnostic_cases').select('id,title,diagnosis_status').eq('vehicle_id',vehicle.id).order('opened_at',{ascending:false}).limit(20);
+ if(cases.error)throw cases.error;
+ const m=modal(`<div class="row between"><div><h3>✅ Validation Engine</h3><div class="small muted">Uji hasil modifikasi/diagnosis terhadap baseline dan acceptance criteria.</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="field"><label>Validation type *</label><input id="valType" placeholder="road test / dyno / measurement / repair verification"></div>
+ <div class="two"><div class="field"><label>Link Modification</label><select id="valMod"><option value="">—</option>${(mods.data||[]).map(x=>`<option value="${esc0(x.id)}">${esc0(x.title)} · ${esc0(x.system)}</option>`).join('')}</select></div><div class="field"><label>Link Diagnostic Case</label><select id="valCase"><option value="">—</option>${(cases.data||[]).map(x=>`<option value="${esc0(x.id)}">${esc0(x.title)}</option>`).join('')}</select></div></div>
+ <div class="field"><label>Baseline JSON</label><textarea id="valBase">{}</textarea></div>
+ <div class="field"><label>Test Conditions JSON</label><textarea id="valCond">{}</textarea></div>
+ <div class="field"><label>Result JSON</label><textarea id="valResult">{}</textarea></div>
+ <div class="field"><label>Verdict</label><select id="valVerdict"><option>pending</option><option>pass</option><option>fail</option><option>conditional</option><option>inconclusive</option></select></div>
+ <button class="btn primary" style="width:100%" id="saveVal">Simpan Validation</button>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove();
+ m.querySelector('#saveVal').onclick=async()=>{
+  try{
+   const parse=id=>{try{return JSON.parse(m.querySelector(id).value||'{}')}catch{throw Error('JSON tidak valid: '+id)}};
+   const type=m.querySelector('#valType').value.trim();if(!type)throw Error('Validation type wajib');
+   const r=await state.sb.from('validation_records').insert({vehicle_id:vehicle.id,modification_id:m.querySelector('#valMod').value||null,diagnostic_case_id:m.querySelector('#valCase').value||null,validation_type:type,baseline:parse('#valBase'),test_conditions:parse('#valCond'),result:parse('#valResult'),verdict:m.querySelector('#valVerdict').value,validated_at:new Date().toISOString(),validated_by:state.user.id}).select().single();
+   if(r.error)throw r.error;
+   if(m.querySelector('#valMod').value){
+    const status=m.querySelector('#valVerdict').value==='pass'?'passed':m.querySelector('#valVerdict').value==='fail'?'failed':m.querySelector('#valVerdict').value==='conditional'?'conditional':'not_tested';
+    await state.sb.from('vehicle_modifications').update({validation_status:status}).eq('id',m.querySelector('#valMod').value).eq('vehicle_id',vehicle.id);
+   }
+   toast0('Validation tersimpan');m.remove();
+  }catch(e){toast0('Gagal simpan validation: '+e.message)}
+ };
+}
+
+
 async function openExpertModal(){
  const v=typeof currentVehicle==='function'?currentVehicle():null;if(!v)return toast0('Pilih kendaraan dulu');
  const m=modal(`<div class="row between"><div><h3>🚘 Automotive Intelligence Hub</h3><div class="small muted">Digital Twin • EV/Engine • Diagnostics • Calculation • Evidence</div></div><button class="btn gray" data-close>✕</button></div>
@@ -170,6 +225,8 @@ async function openExpertModal(){
  <button class="card" id="hubDiag" style="text-align:left"><strong>🩺 Diagnostic Engine</strong><div class="small muted">Differential diagnosis berbasis test</div></button>
  <button class="card" id="hubCalc" style="text-align:left"><strong>🧮 Calculation Engine</strong><div class="small muted">Formula deterministik & tersimpan</div></button>
  <button class="card" id="hubEvidence" style="text-align:left"><strong>📚 Evidence Engine</strong><div class="small muted">Source, claim, confidence & verification</div></button>
+ <button class="card" id="hubMod" style="text-align:left"><strong>🔧 Modification Engineering</strong><div class="small muted">Compatibility, risk, baseline & test plan</div></button>
+ <button class="card" id="hubValidation" style="text-align:left"><strong>✅ Validation Engine</strong><div class="small muted">Test result & acceptance record</div></button>
  </div>
  <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><strong>AI Context Pipeline</strong><div class="small" style="opacity:.75;margin-top:6px">Vehicle → Configuration → Components → Modifications → Evidence → Measurements → Diagnostics → Calculations → Validation. AI hanya menerima context terstruktur; critical math tetap deterministic.</div></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
@@ -177,6 +234,8 @@ async function openExpertModal(){
  m.querySelector('#hubDiag').onclick=()=>{m.remove();openDiagnostic(v)};
  m.querySelector('#hubCalc').onclick=()=>{m.remove();openLab(v)};
  m.querySelector('#hubEvidence').onclick=()=>{m.remove();openEvidence(v)};
+ m.querySelector('#hubMod').onclick=()=>{m.remove();openModification(v)};
+ m.querySelector('#hubValidation').onclick=()=>{m.remove();openValidation(v)};
 }
 
 function openInlineVoice(targetId){
