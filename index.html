@@ -432,6 +432,14 @@ async function loadEvents(){
  state.events=data||[];await loadEventMedia();
 }
 
+function storageSummaryHtml(){
+ const u=state.storageUsage;
+ if(!u)return '<div class="card"><div class="small muted">Cloud storage</div><div class="kpi">—</div><div class="small muted">Belum dapat membaca kuota.</div></div>';
+ const pct=Math.max(0,Math.min(100,Number(u.used_percent)||0));
+ const tone=pct>=90?'danger':pct>=80?'warning':'success';
+ const label=pct>=90?'Hampir penuh':pct>=80?'Perlu diperhatikan':'Aman';
+ return '<div class="card"><div class="row between"><div class="small muted">Cloud storage</div><span class="badge '+tone+'">'+label+'</span></div><div class="kpi" style="font-size:18px">'+formatBytes(u.used_bytes)+' / '+formatBytes(u.quota_bytes)+'</div><div class="small muted">'+pct.toFixed(2)+'% terpakai · '+formatBytes(u.remaining_bytes)+' tersisa</div></div>';
+}
 function renderApp(){
  const v=state.vehicles.find(x=>x.id===state.selected);
  const vehicleCards=state.vehicles.length ? state.vehicles.map(x=>{
@@ -448,7 +456,7 @@ function renderApp(){
  $('#app').innerHTML='<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>'+planLabel+' · '+planStatus+'</small></div><div class="row"><span class="small muted">'+esc(state.user?.email||'')+'</span>'+licenseButton+'<button class="btn gray" id="logout">Keluar</button></div></div></header>'+
  '<main class="wrap"><section class="hero card" style="position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(59,130,246,.28),transparent 38%);pointer-events:none"></div><div class="row between wraprow" style="position:relative"><div><div class="small" style="color:#93c5fd;font-weight:700;letter-spacing:.12em">VEHICLE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:clamp(24px,4vw,34px)">Your Vehicle. Your History.</h2><div class="small muted">Satu tempat untuk memahami perjalanan kendaraan Anda.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">+ Kendaraan</button></div></section>'+
  '<div class="tabs" style="margin-top:12px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">💎 Automotive Expert '+expertLabel+'</button><button class="tab" id="exportBtn">Export</button>'+ownerButton+'</div>'+
- '<div class="grid"><div class="card"><div class="small muted">Kendaraan</div><div class="kpi">'+state.vehicles.length+'</div></div><div class="card"><div class="small muted">Aktivitas</div><div class="kpi">'+state.events.length+'</div></div><div class="card"><div class="small muted">Biaya terlihat</div><div class="kpi" style="font-size:18px">'+rupiah(totalCost)+'</div></div></div>'+
+ '<div class="grid"><div class="card"><div class="small muted">Kendaraan</div><div class="kpi">'+state.vehicles.length+'</div></div><div class="card"><div class="small muted">Aktivitas</div><div class="kpi">'+state.events.length+'</div></div><div class="card"><div class="small muted">Biaya terlihat</div><div class="kpi" style="font-size:18px">'+rupiah(totalCost)+'</div></div>'+storageSummaryHtml()+'</div>'+
  '<section style="margin-top:12px" class="card"><div class="row between"><h3 style="margin:0">Kendaraan</h3><button class="btn ghost" id="voiceBtn">🎙️ Input suara</button></div><div style="margin-top:10px">'+vehicleCards+'</div></section>'+
  (v?vehicleSection(v):'')+'</main></div>';
  const logout=$('#logout'); if(logout) logout.onclick=()=>state.sb.auth.signOut();
@@ -603,7 +611,7 @@ function openEventModal(prefill={}){
  <div class="field"><label>Judul *</label><input id="eTitle" value="${esc(prefill.title||'')}" placeholder="Contoh: Ganti oli + filter oli"></div>
  <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eCost" type="number" min="0" value="${prefill.cost??''}"></div><div class="field"><label>Odometer (km)</label><input id="eOdo" type="number" min="0" value="${prefill.odometer??''}"></div></div>
  <div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEvent">🎙️ Voice</button></div><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea><div id="eventVoiceStatus" class="small muted" style="margin-top:5px">Voice siap • bisa bicara terus sampai Anda menekan Stop.</div></div>
- <div class="field" style="margin-top:12px"><div class="row between"><label>Foto aktivitas</label><span id="newEventPhotoCount" class="small muted">Belum ada foto</span></div><input id="eventPhotosNew" type="file" accept="image/*" multiple><input id="eventCameraNew" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraNewBtn" type="button">📷 Kamera</button></div><div class="small muted" style="margin-top:5px">Bebas berapa saja. Foto dikompres lokal lalu disimpan sebagai evidence aktivitas.</div></div> <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
+ <div class="field" style="margin-top:12px"><div class="row between"><label>Foto aktivitas</label><span id="newEventPhotoCount" class="small muted">Belum ada foto</span></div><input id="eventPhotosNew" type="file" accept="image/*" multiple><input id="eventCameraNew" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraNewBtn" type="button">📷 Kamera</button></div><div class="small muted" style="margin-top:5px">Tanpa batas jumlah foto per aktivitas; mengikuti kuota cloud akun. Foto dikompres lokal lalu disimpan sebagai evidence aktivitas.</div></div> <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
  <button class="btn primary" style="width:100%" id="saveEvent">Simpan aktivitas</button>`);
  m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceEvent').onclick=()=>openInlineVoice('eDesc','voiceEvent','eventVoiceStatus');
  m.querySelector('#saveEvent').onclick=async()=>{
