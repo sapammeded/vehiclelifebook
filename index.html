@@ -375,24 +375,36 @@ function renderAuth(){
  window.focusAuthGate=()=>focusAuthGate();
  function focusAuthGate(){const gate=document.getElementById('authGate');if(gate){gate.scrollIntoView({behavior:'smooth',block:'start'});const email=document.getElementById('email');if(email)setTimeout(()=>email.focus(),350)}}
  const welcomeVideo=document.getElementById('welcomeVideo');
- function forceWelcomeAutoplay(){
+ function startWelcomeVideo(){
    if(!welcomeVideo)return;
    welcomeVideo.autoplay=true;
-   welcomeVideo.muted=false;
-   welcomeVideo.defaultMuted=false;
+   welcomeVideo.muted=true;
+   welcomeVideo.defaultMuted=true;
    welcomeVideo.volume=1;
    const p=welcomeVideo.play();
-   if(p&&p.catch)p.catch(()=>{});
+   if(p&&p.then)p.then(()=>{
+     setTimeout(()=>{
+       try{
+         welcomeVideo.muted=false;
+         welcomeVideo.defaultMuted=false;
+         welcomeVideo.volume=1;
+       }catch(_){}
+     },120);
+   }).catch(()=>{});
  }
- window.__welcomeVideoReady=forceWelcomeAutoplay;
- window.__welcomeVideoPlaying=()=>{};
+ window.__welcomeVideoReady=startWelcomeVideo;
+ window.__welcomeVideoPlaying=()=>{
+   try{
+     welcomeVideo.muted=false;
+     welcomeVideo.defaultMuted=false;
+     welcomeVideo.volume=1;
+   }catch(_){}
+ };
  window.__welcomeVideoError=()=>{};
- welcomeVideo.addEventListener('loadedmetadata',forceWelcomeAutoplay);
- welcomeVideo.addEventListener('canplay',forceWelcomeAutoplay);
- setTimeout(forceWelcomeAutoplay,0);
- setTimeout(forceWelcomeAutoplay,150);
- setTimeout(forceWelcomeAutoplay,500);
- setTimeout(forceWelcomeAutoplay,1200);
+ welcomeVideo.addEventListener('loadedmetadata',startWelcomeVideo);
+ welcomeVideo.addEventListener('canplay',startWelcomeVideo);
+ welcomeVideo.addEventListener('playing',window.__welcomeVideoPlaying,{once:true});
+ startWelcomeVideo();
  document.getElementById('skipWelcome').onclick=()=>{if(welcomeVideo)welcomeVideo.pause();focusAuthGate()};
  document.getElementById('login').onclick=()=>auth('login');document.getElementById('signup').onclick=()=>auth('signup');document.getElementById('reset').onclick=resetPassword;
 }
