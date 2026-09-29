@@ -36,7 +36,7 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 .landing-shell{width:min(980px,100%);display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:stretch}
 .welcome-video{position:relative;overflow:hidden;border-radius:28px;border:1px solid rgba(255,255,255,.13);background:#020617;box-shadow:0 30px 80px rgba(0,0,0,.45);min-height:520px}
 .welcome-video video{width:100%;height:100%;min-height:520px;display:block;object-fit:cover;background:#020617}
-.video-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:28px;background:linear-gradient(180deg,transparent 35%,rgba(2,6,23,.9))}
+.video-unavailable:before{content:"Vehicle Lifebook";position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(28px,5vw,48px);font-weight:700;color:#e2e8f0;background:linear-gradient(135deg,#0f172a,#1e3a8a)}.video-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:28px;background:linear-gradient(180deg,transparent 35%,rgba(2,6,23,.9))}
 .video-badge{display:inline-flex;width:max-content;padding:6px 10px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.08);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
 .landing-auth{align-self:center;background:rgba(255,255,255,.97);color:var(--ink);border:1px solid rgba(255,255,255,.2);border-radius:28px;padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.28)}
 .landing-logo{display:flex;align-items:center;gap:12px;margin-bottom:22px}.landing-logo-mark{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;font-size:24px;box-shadow:0 10px 25px rgba(37,99,235,.28)}
@@ -290,7 +290,7 @@ function renderSetup(msg=''){
 function renderAuth(){
  $('#app').innerHTML=`<main class="landing"><div class="landing-shell">
  <section class="welcome-video">
-   <video id="welcomeVideo" autoplay muted loop playsinline preload="metadata">
+   <video id="welcomeVideo" autoplay muted loop playsinline preload="metadata" onerror="this.style.display='none';this.parentElement.classList.add('video-unavailable')">
      <source src="${WELCOME_VIDEO}" type="video/mp4">
    </video>
    <div class="video-overlay">
