@@ -350,9 +350,8 @@ function renderSetup(msg=''){
 function renderAuth(){
  $('#app').innerHTML=`<main class="landing"><div class="landing-shell">
  <section class="welcome-video" id="welcomePanel">
-   <video id="welcomeVideo" autoplay playsinline preload="auto" webkit-playsinline onloadeddata="window.__welcomeVideoReady&&window.__welcomeVideoReady()" oncanplay="window.__welcomeVideoReady&&window.__welcomeVideoReady()" onplay="window.__welcomeVideoPlaying&&window.__welcomeVideoPlaying()" onended="focusAuthGate()" onerror="window.__welcomeVideoError&&window.__welcomeVideoError()">
+   <video id="welcomeVideo" autoplay playsinline webkit-playsinline preload="auto" x-webkit-airplay="allow" controlslist="nodownload noplaybackrate nofullscreen">
      <source src="./assets/welcome/welcome.mp4?v=20260930" type="video/mp4">
-     <source src="https://cdn.jsdelivr.net/gh/sapammeded/vehiclelifebook@main/assets/welcome/welcome.mp4?v=20260930" type="video/mp4">
    </video>
    <button class="video-skip" id="skipWelcome" type="button">Skip →</button>
  </section>
@@ -374,30 +373,24 @@ function renderAuth(){
  window.focusAuthGate=()=>focusAuthGate();
  function focusAuthGate(){const gate=document.getElementById('authGate');if(gate){gate.scrollIntoView({behavior:'smooth',block:'start'});const email=document.getElementById('email');if(email)setTimeout(()=>email.focus(),350)}}
  const welcomeVideo=document.getElementById('welcomeVideo');
- function tryWelcomePlay(){
+ function forceWelcomeAutoplay(){
    if(!welcomeVideo)return;
+   welcomeVideo.autoplay=true;
    welcomeVideo.muted=false;
-   welcomeVideo.volume=1;
-   const p=welcomeVideo.play();
-   if(p&&p.catch)p.catch(()=>{
-     welcomeVideo.muted=true;
-     const fallback=welcomeVideo.play();
-     if(fallback&&fallback.catch)fallback.catch(()=>{});
-   });
- }
- function enableWelcomeAudio(){
-   if(!welcomeVideo)return;
-   welcomeVideo.muted=false;
+   welcomeVideo.defaultMuted=false;
    welcomeVideo.volume=1;
    const p=welcomeVideo.play();
    if(p&&p.catch)p.catch(()=>{});
  }
- window.__welcomeVideoReady=()=>tryWelcomePlay();
+ window.__welcomeVideoReady=forceWelcomeAutoplay;
  window.__welcomeVideoPlaying=()=>{};
  window.__welcomeVideoError=()=>{};
- document.addEventListener('pointerdown',enableWelcomeAudio,{once:true,passive:true});
- document.addEventListener('touchstart',enableWelcomeAudio,{once:true,passive:true});
- setTimeout(tryWelcomePlay,80);
+ welcomeVideo.addEventListener('loadedmetadata',forceWelcomeAutoplay);
+ welcomeVideo.addEventListener('canplay',forceWelcomeAutoplay);
+ setTimeout(forceWelcomeAutoplay,0);
+ setTimeout(forceWelcomeAutoplay,150);
+ setTimeout(forceWelcomeAutoplay,500);
+ setTimeout(forceWelcomeAutoplay,1200);
  document.getElementById('skipWelcome').onclick=()=>{if(welcomeVideo)welcomeVideo.pause();focusAuthGate()};
  document.getElementById('login').onclick=()=>auth('login');document.getElementById('signup').onclick=()=>auth('signup');document.getElementById('reset').onclick=resetPassword;
 }
