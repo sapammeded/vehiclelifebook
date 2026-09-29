@@ -263,6 +263,7 @@ async function openExpertModal(){
  <button class="card" id="hubMod" style="text-align:left"><strong>🔧 Modification Engineering</strong><div class="small muted">Compatibility, risk, baseline & test plan</div></button>
  <button class="card" id="hubValidation" style="text-align:left"><strong>✅ Validation Engine</strong><div class="small muted">Test result & acceptance record</div></button>
  <button class="card" id="hubEngineering" style="text-align:left"><strong>⚙️ Mechanical Engineering Lab</strong><div class="small muted">Clearance, thermal expansion, deck, ring & bearing calculations</div></button>
+ <button class="card" id="hubExpertPrompt" style="text-align:left"><strong>🧠 Universal Expert Prompt</strong><div class="small muted">Pertanyaan bebas → kebutuhan data → OEM evidence → prompt engineering</div></button>
  </div>
  <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><strong>AI Context Pipeline</strong><div class="small" style="opacity:.75;margin-top:6px">Vehicle → Configuration → Components → Modifications → Evidence → Measurements → Diagnostics → Calculations → Validation. AI hanya menerima context terstruktur; critical math tetap deterministic.</div></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
@@ -273,6 +274,45 @@ async function openExpertModal(){
  m.querySelector('#hubMod').onclick=()=>{m.remove();openModification(v)};
  m.querySelector('#hubValidation').onclick=()=>{m.remove();openValidation(v)};
  m.querySelector('#hubEngineering').onclick=()=>{m.remove();openEngineeringLab(v)};
+ m.querySelector('#hubExpertPrompt').onclick=()=>{m.remove();openUniversalExpertPrompt(v)};
+}
+
+async function openUniversalExpertPrompt(vehicle){
+ const m=modal(`<div class="row between"><div><h3>🧠 Universal Automotive Expert</h3><div class="small muted">Pertanyaan → data wajib → evidence OEM → prompt siap pakai</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="field"><label>Pertanyaan / tujuan user *</label><textarea id="expertQuestion" rows="7" placeholder="Contoh: Honda BeAT 110 mau saya ubah menjadi 250 cc untuk race. Apa saja yang harus diubah dan bagaimana menghitungnya?"></textarea></div>
+ <div class="two">
+  <div class="field"><label>Make</label><input id="expertMake" value="${esc0(vehicle.brand||vehicle.make||'')}"></div>
+  <div class="field"><label>Model</label><input id="expertModel" value="${esc0(vehicle.model||'')}"></div>
+  <div class="field"><label>Year</label><input id="expertYear" value="${esc0(vehicle.year||'')}"></div>
+  <div class="field"><label>Variant</label><input id="expertVariant" value="${esc0(vehicle.variant||'')}"></div>
+  <div class="field"><label>Engine Code</label><input id="expertEngine" value="${esc0(vehicle.engine_code||'')}"></div>
+  <div class="field"><label>VIN (opsional)</label><input id="expertVin" value="${esc0(vehicle.vin||'')}"></div>
+ </div>
+ <div class="row"><button class="btn primary" id="buildExpertPrompt">⚡ Analisis & Buat Prompt</button><button class="btn ghost" id="copyExpertPrompt">📋 Copy</button></div>
+ <div id="expertAnalysis" class="card" style="margin-top:10px;box-shadow:none"></div>
+ <textarea id="expertPromptOut" rows="18" style="width:100%;margin-top:10px;font-family:monospace" placeholder="Prompt akan muncul di sini..."></textarea>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove();
+ let lastPrompt='';
+ m.querySelector('#buildExpertPrompt').onclick=async()=>{
+  try{
+   const q=m.querySelector('#expertQuestion').value.trim();if(!q)throw Error('Pertanyaan wajib diisi');
+   const v={...vehicle,brand:m.querySelector('#expertMake').value.trim()||vehicle.brand,model:m.querySelector('#expertModel').value.trim()||vehicle.model,year:m.querySelector('#expertYear').value.trim()||vehicle.year,variant:m.querySelector('#expertVariant').value.trim()||vehicle.variant,engine_code:m.querySelector('#expertEngine').value.trim()||vehicle.engine_code,vin:m.querySelector('#expertVin').value.trim()||vehicle.vin};
+   let ctx=null;try{ctx=await loadVehicleVerifiedSpecs(v)}catch(e){ctx=null}
+   const a=NS.oem.classifyQuestion(q);
+   lastPrompt=NS.oem.buildExpertPrompt(v,q,ctx);
+   m.querySelector('#expertPromptOut').value=lastPrompt;
+   m.querySelector('#expertAnalysis').innerHTML='<strong>Research plan</strong><div class="small muted" style="margin-top:6px">Type: '+esc0(a.vehicleType)+' · Domain: '+esc0(a.domains.join(', '))+'</div><div class="small" style="margin-top:6px"><strong>Data yang wajib dicari:</strong> '+esc0(a.requestedSpecs.join(', ')||'baseline umum')+'</div><div class="small muted" style="margin-top:6px">Rule: OEM-first · critical data VERIFIED · konflik dilaporkan · UNKNOWN bila tidak terbukti.</div>';
+   try{
+    if(state?.sb?.from){
+     await state.sb.from('vehicle_spec_requests').insert({vehicle_id:v.id,requested_specs:a.requestedSpecs,source_policy:'official_first/critical_requires_verified/never_guess',generated_prompt:lastPrompt,status:'pending',created_by:state.user?.id||null});
+    }
+   }catch(_){}
+  }catch(e){toast0('Prompt gagal dibuat: '+e.message)}
+ };
+ m.querySelector('#copyExpertPrompt').onclick=async()=>{
+  if(!lastPrompt)return toast0('Buat prompt dulu');
+  try{await navigator.clipboard.writeText(lastPrompt);toast0('Prompt berhasil dicopy')}catch{m.querySelector('#expertPromptOut').select();document.execCommand('copy');toast0('Prompt berhasil dicopy')}
+ };
 }
 
 function openInlineVoice(targetId){
@@ -326,24 +366,80 @@ NS.health={
 
 // v2.3 Universal OEM Evidence + telemetry/maintenance context
 NS.oem={
+  version:'3.0.0',
   criticalKeys:['displacement_cc','bore_mm','stroke_mm','compression_ratio','piston_diameter_mm','cylinder_bore_mm','connecting_rod_length_mm','rod_length_mm','deck_height_mm','ring_end_gap_mm','piston_to_wall_clearance_mm','valve_to_piston_clearance_mm','bearing_clearance_mm','cam_timing_deg','injector_flow','fuel_pressure','oil_pressure','service_interval_km','service_interval_months'],
+  domainMap:{
+    displacement:['displacement_cc','bore_mm','stroke_mm','compression_ratio','cylinders'],
+    engine_build:['displacement_cc','bore_mm','stroke_mm','compression_ratio','piston_diameter_mm','cylinder_bore_mm','rod_length_mm','deck_height_mm','ring_end_gap_mm','piston_to_wall_clearance_mm','valve_to_piston_clearance_mm','bearing_clearance_mm','cam_timing_deg','fuel_pressure','oil_pressure'],
+    fuel:['fuel_type','fuel_system','injector_flow','fuel_pressure','throttle_body','fuel_pump'],
+    cooling:['cooling_system','coolant_capacity','thermostat','fan_control','operating_temperature'],
+    lubrication:['oil_specification','oil_capacity','oil_pressure','service_interval_km','service_interval_months'],
+    cvt:['transmission_type','gear_ratio','final_drive_ratio','belt_spec','roller_spec','clutch_spec'],
+    drivetrain:['transmission_type','gear_ratio','final_drive_ratio','clutch_spec','differential_spec','drive_layout'],
+    chassis:['frame_type','wheelbase_mm','curb_weight_kg','front_suspension','rear_suspension','tire_size','brake_spec'],
+    brake:['front_brake','rear_brake','abs_type','brake_disc_size','brake_fluid'],
+    suspension:['front_suspension','rear_suspension','spring_rate','shock_spec','wheel_travel'],
+    ev:['battery_capacity_kwh','usable_battery_kwh','system_voltage_v','motor_peak_kw','motor_torque_nm','charger_spec','bms_limits','thermal_management'],
+    hybrid:['engine_type','battery_capacity_kwh','system_voltage_v','motor_peak_kw','hybrid_architecture','fuel_system','cooling_system'],
+    electrical:['battery_voltage','alternator_output','charging_system','fuse_rating','ecu_type','wiring_spec'],
+    diagnostics:['dtc','freeze_frame','live_data','service_limits','test_procedure'],
+    maintenance:['service_interval_km','service_interval_months','fluid_specification','fluid_capacity','wear_limit','replacement_interval'],
+    modification:['baseline_specs','compatibility','dimensions','load','thermal_limit','electrical_limit','ecu_calibration','brake_capacity','chassis_capacity','validation_limits']
+  },
   isCritical(key){return this.criticalKeys.includes(String(key||'').toLowerCase())},
-  buildResearchPrompt(vehicle,missing=[]){
-    const v=vehicle||{};
-    const requested=missing.length?missing:this.criticalKeys;
+  classifyQuestion(question=''){
+    const q=String(question||'').toLowerCase();
+    const domains=[];
+    const add=(d,re)=>{if(re.test(q)&&!domains.includes(d))domains.push(d)};
+    add('engine_build',/bore.?up|stroker|cc|cc.?jadi|kapasitas|piston|seher|kruk.?as|crank|connecting rod|stang seher|kompresi|compression|cam|noken|klep|valve|porting|head|turbo|supercharger|race|racing|power|tenaga|torsi|torque/);
+    add('fuel',/injector|injektor|fuel|bensin|bbm|throttle body|tb|pompa bensin|fuel pump|afr|lambda|mixture/);
+    add('cooling',/overheat|panas|coolant|radiator|thermostat|kipas|fan|temperature|temperatur/);
+    add('lubrication',/oli|oil|oil pressure|tekanan oli|pelumas|bearing|clearance/);
+    add('cvt',/cvt|roller|variator|v.?belt|belt|kampas ganda|clutch|kopling sentrifugal/);
+    add('drivetrain',/transmisi|gear|rasio|final drive|differential|kopling|clutch|drivetrain/);
+    add('chassis',/rangka|frame|wheelbase|berat|ban|tire|roda|wheel|chassis/);
+    add('brake',/rem|brake|abs|disc|cakram|master|kaliper|caliper/);
+    add('suspension',/suspensi|suspension|shock|fork|pegas|spring/);
+    add('ev',/motor listrik|electric motor|ev|bev|baterai|battery|soc|soh|inverter|bms|high voltage|hv|charging|charger|kwh/);
+    add('hybrid',/hybrid|phev/);
+    add('electrical',/aki|battery 12v|alternator|kelistrikan|ecu|wiring|sekering|fuse|tegangan|voltage/);
+    add('diagnostics',/diagnosa|diagnostic|diagnosis|error|dtc|check engine|brebet|misfire|susah hidup|mogok|gejala|problem|masalah|rusak/);
+    add('maintenance',/service|servis|maintenance|interval|jadwal|ganti oli|wear limit|batas aus/);
+    add('modification',/modif|modifikasi|upgrade|ubah|convert|konversi|swap|custom|build|racing|race/);
+    if(!domains.length)domains.push('diagnostics');
+    const vehicleType=/motor listrik|electric motorcycle|scooter listrik|bev|ev|baterai|inverter|bms/.test(q)?'ev':/mobil|sedan|suv|mpv|pickup|truck|truk|car/.test(q)?'car':/motor|matic|skutik|scooter|manual|bebek|sportbike|naked|supersport/.test(q)?'motorcycle':'unknown';
+    const requested=[...new Set(domains.flatMap(d=>this.domainMap[d]||[]))];
+    return {vehicleType,domains,requestedSpecs:requested};
+  },
+  isCritical(key){return this.criticalKeys.includes(String(key||'').toLowerCase())},
+  buildResearchPrompt(vehicle,missing=[],question=''){
+    const v=vehicle||{}, analysis=this.classifyQuestion(question), requested=[...new Set([...(missing||[]),...analysis.requestedSpecs])];
+    const identity={make:v.brand||v.make||null,model:v.model||null,year:v.year||null,variant:v.variant||null,engine_code:v.engine_code||v.engineCode||null,vin:v.vin||null,vehicle_type:analysis.vehicleType};
     return [
-      'VEHICLE LIFEBOOK — OEM VERIFIED SPECIFICATION RESEARCH',
-      'Identify the exact vehicle using make, model, year, variant, engine code and VIN when available.',
-      'RULES: OEM/manufacturer source first. Prefer official model specification, official service/manual, official parts catalogue, official VIN lookup, official TSB.',
-      'Use secondary sources only to cross-check; never promote them to OEM-verified without corroboration.',
-      'For every numeric claim return source URL, publisher, document title/revision, applicability, retrieval date and verification status.',
-      'NEVER GUESS. If a value cannot be verified from an authoritative source, return UNKNOWN.',
-      'Assembly-critical dimensions must be VERIFIED before being used as an assembly specification.',
-      'Do not confuse piston-pin diameter, ring diameter, bore, nominal piston diameter, or service limit.',
-      'Return strict JSON: vehicle_identity, specs[], missing_specs[], conflicts[], sources[].',
-      'vehicle_identity='+JSON.stringify({make:v.brand,model:v.model,year:v.year,variant:v.variant,engine_code:v.engine_code,vin:v.vin}),
-      'requested_specs='+JSON.stringify(requested)
+      'VEHICLE LIFEBOOK — UNIVERSAL AUTOMOTIVE EXPERT RESEARCH PROMPT v3',
+      'ROLE: Act as a senior automotive engineering expert covering ICE, motorcycle/scooter manual & CVT, passenger/commercial vehicles, hybrid, PHEV and BEV/EV.',
+      'TASK: Analyze the USER QUESTION only after establishing the exact vehicle identity and an evidence-backed technical baseline.',
+      'VEHICLE_IDENTITY='+JSON.stringify(identity),
+      'USER_QUESTION='+JSON.stringify(String(question||'')),
+      'QUESTION_CLASSIFICATION='+JSON.stringify({vehicleType:analysis.vehicleType,domains:analysis.domains}),
+      'REQUIRED_DATA='+JSON.stringify(requested),
+      'SOURCE PRIORITY: 1) OEM/manufacturer official specification, service/repair manual, parts catalogue, VIN/spec lookup, TSB/technical bulletin; 2) authorized manufacturer/dealer technical documentation; 3) reputable secondary source only for corroboration.',
+      'VERIFICATION: Every numeric/technical claim must include publisher, source title, URL/document reference, revision/date when available, applicability (model/year/variant/engine), retrieval date and verification_status.',
+      'NEVER GUESS. If authoritative evidence is unavailable or conflicting, output UNKNOWN or CONFLICT instead of inventing a value.',
+      'CRITICAL RULE: Bore, stroke, piston diameter, cylinder bore, rod length, deck height, ring gap, piston-to-wall, valve-to-piston, bearing clearance, torque specs and service limits are assembly/safety-critical. Do not promote secondary estimates to VERIFIED.',
+      'DISTINGUISH: OEM nominal specification vs measured value vs aftermarket component specification vs service limit vs modification target.',
+      'CONFLICT RULE: Do not average conflicting specifications. Preserve each source, determine applicability/revision, and report the unresolved conflict when it cannot be resolved.',
+      'ENGINEERING RULE: Separate OEM BASELINE from MODIFIED STATE. For modification analysis, calculate from verified inputs and explicitly list every assumption and unknown.',
+      'SAFETY RULE: For brakes, steering, chassis, HV/EV systems, fuel pressure, thermal limits and engine assembly, provide test/validation requirements and do not claim safety without evidence.',
+      'OUTPUT: vehicle_identity, question_analysis, verified_baseline, corroborated_data, unknown_data, conflicts, sources, calculations, modification_compatibility, risks, test_plan, validation_criteria, final_answer.',
+      'Return concise evidence-backed reasoning; do not fabricate citations or URLs.'
     ].join('\n');
+  },
+  buildExpertPrompt(vehicle,question,specContext){
+    const ctx=specContext||{}, specs=ctx.specs||[];
+    const base=this.buildResearchPrompt(vehicle,[],question);
+    return base+'\nSTORED_VERIFIED_CONTEXT='+JSON.stringify(specs)+'\n'+
+      'CONTEXT RULE: Stored VERIFIED evidence may be reused only when applicability matches the exact vehicle. CORROBORATED data must remain labeled corroborated. Missing critical data blocks that calculation until sourced.';
   }
 };
 
