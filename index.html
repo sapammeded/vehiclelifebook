@@ -559,29 +559,22 @@ async function loadEventDetail(eventId,type){
  const {data:items,error:ie}=await state.sb.from('service_items').select('*').eq('event_id',eventId).order('created_at');if(ie)throw ie;
  return {...(data||{}),items:items||[]};
 }
-function openEditEventModal(eventId){
+async function openEditEventModal(eventId){
  const e=state.events.find(x=>x.id===eventId);if(!e)return;
- const m=modal(`<div class="row between"><h3>✏️ Edit aktivitas</h3><button class="btn gray" data-close>✕</button></div>
- <div class="badge success">${esc(currentVehicle()?.plate_number||'')}</div>
- <div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eeType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eeDate" type="date" value="${esc(e.event_date||today())}"></div></div>
- <div class="field"><label>Judul *</label><input id="eeTitle" value="${esc(e.title||'')}"></div>
- <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eeCost" type="number" min="0" value="${Number(e.total_cost||0)}"></div><div class="field"><label>Odometer (km)</label><input id="eeOdo" type="number" min="0" value="${e.odometer??''}"></div></div>
- <div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEditEvent">🎙️ Voice</button></div><textarea id="eeDesc" style="min-height:150px">${esc(e.description||'')}</textarea><div id="editEventVoiceStatus" class="small muted">Bisa bicara terus sampai Anda menekan Stop.</div></div>
- <div class="row" style="margin-top:12px"><button class="btn gray" id="editEventPhotos" type="button">📷 Kelola foto (${mediaCount(eventId)})</button><button class="btn primary" id="saveEditEvent" style="flex:1">Simpan perubahan</button></div>`);
- m.querySelector('#eeType').value=e.event_type||'note';
- m.querySelector('[data-close]').onclick=()=>closeModal(m);
- m.querySelector('#voiceEditEvent').onclick=()=>openInlineVoice('eeDesc','voiceEditEvent','editEventVoiceStatus');
+ let detail={};try{detail=await loadEventDetail(eventId,e.event_type)}catch(err){toast('Gagal membaca detail: '+err.message);return}
+ const m=modal('<div class="row between"><h3>✏️ Edit aktivitas</h3><button class="btn gray" data-close>✕</button></div>'+
+ '<div class="badge success">'+esc(currentVehicle()?.plate_number||'')+'</div>'+
+ '<div class="two" style="margin-top:12px"><div class="field"><label>Jenis *</label><select id="eeType"><option value="fuel">BBM</option><option value="service">Servis</option><option value="damage">Kerusakan</option><option value="part">Spare part</option><option value="inspection">Inspeksi</option><option value="expense">Pengeluaran</option><option value="note">Catatan</option></select></div><div class="field"><label>Tanggal *</label><input id="eeDate" type="date" value="'+esc(e.event_date||today())+'"></div></div>'+
+ '<div class="field"><label>Judul *</label><input id="eeTitle" value="'+esc(e.title||'')+'"></div>'+
+ '<div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eeCost" type="number" min="0" value="'+Number(e.total_cost||0)+'"></div><div class="field"><label>Odometer (km)</label><input id="eeOdo" type="number" min="0" value="'+(e.odometer??'')+'"></div></div>'+
+ '<div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEditEvent">🎙️ Voice</button></div><textarea id="eeDesc" style="min-height:130px">'+esc(e.description||'')+'</textarea></div>'+
+ '<div id="eventDetailForm" class="card" style="box-shadow:none;background:#f8fafc;margin-top:10px"></div>'+
+ '<div class="row" style="margin-top:12px"><button class="btn gray" id="editEventPhotos" type="button">📷 Kelola foto ('+mediaCount(eventId)+')</button><button class="btn primary" id="saveEditEvent" style="flex:1">Simpan perubahan</button></div>');
+ const typeEl=m.querySelector('#eeType');typeEl.value=e.event_type||'note';
+ const renderDetail=async type=>{let d={};if(type===e.event_type)d=detail;else if(type!=='note'){try{d=await loadEventDetail(eventId,type)}catch{d={}}}m.querySelector('#eventDetailForm').innerHTML=detailFormHtml(type,d);const sev=m.querySelector('#dSeverity');if(sev&&d.severity)sev.value=d.severity;const st=m.querySelector('#dStatus');if(st&&d.status)st.value=d.status;const res=m.querySelector('#dResult');if(res&&d.result)res.value=d.result;const add=m.querySelector('#addServiceItem');if(add)add.onclick=()=>{const box=m.querySelector('#serviceItems');const n=box.querySelectorAll('.service-item').length+1;const temp=document.createElement('div');temp.innerHTML=detailFormHtml('service',{items:[{}]});const item=temp.querySelector('.service-item');item.querySelector('.small').textContent='Item '+n;box.appendChild(item)}};
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceEditEvent').onclick=()=>openInlineVoice('eeDesc','voiceEditEvent','eventVoiceStatus');typeEl.onchange=()=>renderDetail(typeEl.value);await renderDetail(typeEl.value);
  m.querySelector('#editEventPhotos').onclick=()=>{closeModal(m);openEventMediaModal(eventId)};
- m.querySelector('#saveEditEvent').onclick=async()=>{
-  const title=m.querySelector('#eeTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}
-  const cost=Number(m.querySelector('#eeCost').value||0),odo=m.querySelector('#eeOdo').value===''?null:Number(m.querySelector('#eeOdo').value);
-  if(cost<0||(odo!=null&&odo<0)){toast('Nilai biaya/odometer tidak valid');return}
-  setBusy(true);try{
-   const {error}=await state.sb.from('vehicle_events').update({event_type:m.querySelector('#eeType').value,event_date:m.querySelector('#eeDate').value,title,description:m.querySelector('#eeDesc').value.trim()||null,total_cost:cost,odometer:odo}).eq('id',eventId).eq('created_by',state.user.id);
-   if(error)throw error;
-   closeModal(m);await loadVehicles();await loadStorageUsage();renderApp();toast('Aktivitas diperbarui');
-  }catch(err){toast(err.message||'Gagal mengedit aktivitas')}finally{setBusy(false)}
- };
+ m.querySelector('#saveEditEvent').onclick=async()=>{const title=m.querySelector('#eeTitle').value.trim();if(!title){toast('Judul aktivitas wajib');return}const cost=Number(m.querySelector('#eeCost').value||0),odo=m.querySelector('#eeOdo').value===''?null:Number(m.querySelector('#eeOdo').value);if(cost<0||(odo!=null&&odo<0)){toast('Nilai biaya/odometer tidak valid');return}let detailData={};try{detailData=readDetailFromModal(m,typeEl.value)}catch(err){toast(err.message);return}setBusy(true);try{const {error}=await state.sb.rpc('update_vehicle_event',{p_event_id:eventId,p_event_type:typeEl.value,p_event_date:m.querySelector('#eeDate').value,p_title:title,p_description:m.querySelector('#eeDesc').value.trim()||null,p_total_cost:cost,p_odometer:odo,p_detail:detailData});if(error)throw error;closeModal(m);await loadVehicles();await loadStorageUsage();renderApp();toast('Aktivitas dan detail diperbarui')}catch(err){toast(err.message||'Gagal mengedit aktivitas')}finally{setBusy(false)}};
 }
 async function deleteEvent(eventId){
  const e=state.events.find(x=>x.id===eventId);if(!e)return;
