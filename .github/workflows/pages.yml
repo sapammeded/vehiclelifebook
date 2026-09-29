@@ -30,6 +30,7 @@ jobs:
         run: node scripts/validate-index.mjs
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: validate
     environment:
       name: github-pages

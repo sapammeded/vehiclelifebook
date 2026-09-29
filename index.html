@@ -53,6 +53,7 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 
+<script src="js/global-automotive-intelligence.js"></script>
 <script>
 'use strict';
 
@@ -223,6 +224,37 @@ function openInlineVoice(targetId){
  r.onerror=e=>toast("Voice: "+e.error);
  try{r.start()}catch(e){}
 }
+function openGlobalAutomotiveModal(){
+ if(state.plan!=='owner' && state.plan!=='pro'){openUpgradeModal('Global Automotive Intelligence adalah fitur PRO.');return}
+ const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
+ const m=modal('<div class="row between"><div><h3 style="margin:0">🧠 Global Automotive Intelligence</h3><div class="small muted">OEM-first · evidence-driven · semua kendaraan</div></div><button class="btn gray" data-close>✕</button></div>'+
+ '<div class="pro card" style="margin-top:12px"><strong>Engine universal</strong><div class="small" style="margin-top:5px;opacity:.9">Motor · mobil · truck · EV · hybrid · ICE · semua merek/model. Tidak mengunci logic ke PCX.</div></div>'+
+ '<div class="small muted" style="margin-top:12px">Kendaraan: '+esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))+'</div>'+
+ '<div class="field" style="margin-top:10px"><label>Mission / pertanyaan</label><textarea id="globalMissionQ" style="min-height:110px" placeholder="Contoh: Saya mau akselerasi awal lebih responsif. Cari baseline OEM, part yang benar-benar cocok, risiko, perhitungan dan test plan."></textarea></div>'+
+ '<div class="two"><div class="field"><label>Nomor part OEM (opsional)</label><input id="globalPartNo" placeholder="Contoh: 22123-K0S-V00"></div><div class="field"><label>Komponen (opsional)</label><input id="globalComponent" placeholder="CVT / brake / engine"></div></div>'+
+ '<div class="row" style="margin-top:10px"><button class="btn primary" id="buildGlobalMission">⚙️ Build Mission</button><button class="btn ghost" id="findGlobalParts">🔩 Cari OEM Parts</button></div>'+
+ '<div id="globalOut" style="margin-top:12px"></div>');
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#buildGlobalMission').onclick=()=>{
+   const q=m.querySelector('#globalMissionQ').value.trim();if(!q){toast('Isi mission dulu');return}
+   const mission=window.VehicleLifebookGlobal.buildMission(v,q);
+   const prompt=window.VehicleLifebookGlobal.buildPrompt(v,q,mission);
+   const out=m.querySelector('#globalOut');
+   out.innerHTML='<div class="row between"><strong>Engineering Mission siap</strong><span class="badge success">GLOBAL V1</span></div><div class="small muted" style="margin-top:6px">Domain: '+esc(mission.domains.join(', '))+' · Critical evidence: '+esc(String(mission.critical_evidence.length))+'</div><div class="promptbox" id="globalPrompt" style="margin-top:8px;white-space:pre-wrap"></div><button class="btn primary" style="width:100%;margin-top:10px" id="copyGlobalPrompt">📋 Salin Mission Prompt</button>';
+   out.querySelector('#globalPrompt').textContent=prompt;
+   out.querySelector('#copyGlobalPrompt').onclick=async()=>{try{await navigator.clipboard.writeText(prompt);toast('Mission prompt disalin')}catch{const ta=document.createElement('textarea');ta.value=prompt;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Mission prompt disalin')}};
+ };
+ m.querySelector('#findGlobalParts').onclick=async()=>{
+   const q=m.querySelector('#globalMissionQ').value.trim(),pn=m.querySelector('#globalPartNo').value.trim(),component=m.querySelector('#globalComponent').value.trim();
+   if(!q&&!pn&&!component){toast('Isi pertanyaan, nomor part, atau komponen');return}
+   const out=m.querySelector('#globalOut');out.innerHTML='<div class="small muted">Mencari evidence OEM…</div>';
+   try{
+     const data=await window.VehicleLifebookGlobal.queryParts({supabase:state.sb,vehicle:v,query:q,partNumber:pn,component});
+     out.innerHTML=window.VehicleLifebookGlobal.renderPartResults(data,esc);
+     if(data?.rules?.never_guess)out.innerHTML+='<div class="small muted" style="margin-top:9px">Rule: exact OEM part number adalah evidence kuat; family/cc/platform saja bukan bukti kompatibilitas.</div>';
+   }catch(e){out.innerHTML='<div class="empty">OEM Parts Engine: '+esc(e.message||e)+'</div>'}
+ };
+}
 function openExpertModal(){
  if(state.plan!=='pro' && state.plan!=='owner'){openUpgradeModal('Automotive Expert adalah fitur PRO.');return}
  const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
@@ -375,12 +407,13 @@ function renderApp(){
  const expertBtn=$('#expertBtn'); if(expertBtn) expertBtn.onclick=()=>openExpertModal();
  const exportBtn=$('#exportBtn'); if(exportBtn) exportBtn.onclick=()=>openExportModal();
  const addEvent=$('#addEvent'); if(addEvent) addEvent.onclick=()=>openEventModal();
+ const globalAutoBtn=$('#globalAutoBtn'); if(globalAutoBtn) globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
 }
 
 function vehicleSection(v){
  const total=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
- return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><button class="btn primary" id="addEvent">+ Aktivitas</button></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
+ return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><div class="row"><button class="btn ghost" id="globalAutoBtn">🧠 Global Automotive</button><button class="btn primary" id="addEvent">+ Aktivitas</button></div></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
  <div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Timeline</h3><input id="eventSearch" style="max-width:220px" placeholder="Cari aktivitas..."></div><div id="timeline" style="margin-top:12px">${timelineHtml(state.events)}</div></div></section>`;
 }
 function timelineHtml(events){
@@ -399,12 +432,13 @@ function openVehicleModal(){
  <div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="vPlate" placeholder="B 1234 ABC"></div><div class="field"><label>Tahun</label><input id="vYear" type="number" min="1900" max="2200"></div></div>
  <div class="two"><div class="field"><label>Merek</label><input id="vBrand" placeholder="Toyota"></div><div class="field"><label>Model</label><input id="vModel" placeholder="Avanza"></div></div>
  <div class="two"><div class="field"><label>Varian</label><input id="vVariant"></div><div class="field"><label>Warna</label><input id="vColor"></div></div>
+ <div class="two"><div class="field"><label>VIN / Nomor rangka</label><input id="vChassis" autocomplete="off"></div><div class="field"><label>Engine code</label><input id="vEngineCode" placeholder="Contoh: KF81E"></div></div>
  <div class="field"><label>Catatan / hasil Voice</label><textarea id="vNotes"></textarea></div><button class="btn primary" style="width:100%" id="saveVehicle">Simpan kendaraan</button>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
  m.querySelector('#saveVehicle').onclick=async()=>{
   const plate=m.querySelector('#vPlate').value.trim().toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
   setBusy(true);try{
-   const {data,error}=await state.sb.from('vehicles').insert({owner_id:state.user.id,plate_number:plate,year:Number(m.querySelector('#vYear').value)||null,brand:m.querySelector('#vBrand').value.trim()||null,model:m.querySelector('#vModel').value.trim()||null,variant:m.querySelector('#vVariant').value.trim()||null,color:m.querySelector('#vColor').value.trim()||null,notes:m.querySelector('#vNotes').value.trim()||null}).select().single();
+   const {data,error}=await state.sb.from('vehicles').insert({owner_id:state.user.id,plate_number:plate,year:Number(m.querySelector('#vYear').value)||null,brand:m.querySelector('#vBrand').value.trim()||null,model:m.querySelector('#vModel').value.trim()||null,variant:m.querySelector('#vVariant').value.trim()||null,color:m.querySelector('#vColor').value.trim()||null,chassis_number:m.querySelector('#vChassis').value.trim()||null,metadata:{engine_code:m.querySelector('#vEngineCode').value.trim()||null},notes:m.querySelector('#vNotes').value.trim()||null}).select().single();
    if(error)throw error;state.selected=data.id;closeModal(m);await loadVehicles();renderApp();toast('Kendaraan tersimpan');
   }catch(e){toast(e.message)}finally{setBusy(false)}
  };
