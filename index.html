@@ -485,7 +485,7 @@ function mediaThumbsHtml(eventId){
 function openEventMediaModal(eventId){
  const e=state.events.find(x=>x.id===eventId);if(!e)return;
  const m=modal('<div class="row between"><div><h3>📷 Foto aktivitas</h3><div class="small muted">'+esc(e.event_date+' · '+e.title)+'</div></div><button class="btn gray" data-close>✕</button></div>'+
- '<div class="card" style="margin-top:12px;background:#f8fafc;box-shadow:none"><div class="small muted">Foto tersimpan untuk aktivitas ini</div><div class="small muted">Storage: ${state.storageUsage?formatBytes(state.storageUsage.used_bytes)+' / '+formatBytes(state.storageUsage.quota_bytes):'—'}</div><div id="eventMediaGrid" class="media-grid" style="margin-top:10px"></div></div>'+
+ '<div class="card" style="margin-top:12px;background:#f8fafc;box-shadow:none"><div class="small muted">Foto tersimpan untuk aktivitas ini</div><div class="small muted">Storage: '+(state.storageUsage?formatBytes(state.storageUsage.used_bytes)+' / '+formatBytes(state.storageUsage.quota_bytes):'—')+'</div><div id="eventMediaGrid" class="media-grid" style="margin-top:10px"></div></div>'+
  '<div class="field" style="margin-top:12px"><label>Tambah foto — bebas berapa saja</label><input id="eventPhotos" type="file" accept="image/*" multiple><input id="eventCamera" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraBtn" type="button">📷 Kamera</button><span id="eventPhotoCount" class="small muted">Belum ada foto baru</span></div></div>'+
  '<button class="btn primary" style="width:100%" id="uploadEventPhotos">⬆️ Simpan Foto ke Aktivitas</button>');
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
