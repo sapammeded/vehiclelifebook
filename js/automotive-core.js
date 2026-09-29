@@ -107,6 +107,27 @@ async function openTwin(vehicle){
  };
 }
 
+function openEngineeringLab(vehicle){
+ const m=modal(`<div class="row between"><div><h3>⚙️ Mechanical Engineering Lab</h3><div class="small muted">Thermal expansion, piston/block clearance, ring gap, deck & bearing clearance.</div></div><button class="btn gray" data-close>✕</button></div>
+ <div class="field"><label>Calculator</label><select id="engType">
+ <option value="pistonwall">Piston ↔ Cylinder Wall</option><option value="ringgap">Ring End Gap at Temperature</option><option value="deck">Piston-to-Deck</option><option value="bearing">Bearing Oil Clearance</option><option value="rod">Rod Ratio</option><option value="valve">Piston-to-Valve Safety</option></select></div>
+ <div id="engFields"></div><div class="small muted" style="margin-top:8px">⚠️ Coefficient/material dan minimum clearance harus berasal dari OEM/piston manufacturer bila tersedia. Tanpa spec tersebut hasil hanya engineering calculation, bukan assembly specification.</div>
+ <pre id="engResult" style="white-space:pre-wrap;margin-top:10px">Isi parameter.</pre><button class="btn primary" id="runEng" style="width:100%">Hitung & Simpan</button>`);
+ m.querySelector('[data-close]').onclick=()=>m.remove();
+ const fs={
+ pistonwall:[['coldBoreMm','Cold bore (mm)'],['coldPistonMm','Cold piston (mm)'],['boreAlphaPerC','Bore α /°C'],['pistonAlphaPerC','Piston α /°C'],['referenceTempC','Reference °C'],['operatingTempC','Operating °C']],
+ ringgap:[['coldGapMm','Cold ring gap (mm)'],['ringAlphaPerC','Ring α /°C'],['ringDiameterMm','Ring diameter (mm)'],['referenceTempC','Reference °C'],['operatingTempC','Operating °C']],
+ deck:[['blockDeckHeightMm','Block deck height (mm)'],['headGasketCompressedMm','Compressed gasket (mm)'],['pistonCompressionHeightMm','Piston compression height (mm)'],['rodLengthMm','Rod length (mm)'],['strokeMm','Stroke (mm)'],['pistonAboveDeckMm','Measured piston above deck (mm)']],
+ bearing:[['journalDiameterMm','Journal diameter (mm)'],['bearingBoreDiameterMm','Bearing bore diameter (mm)']],
+ rod:[['rodLengthMm','Rod length (mm)'],['strokeMm','Stroke (mm)']],
+ valve:[['measuredClearanceMm','Measured clearance (mm)'],['minimumRequiredMm','OEM minimum (mm)']]
+ };
+ const funcs={pistonwall:'pistonWallClearance',ringgap:'ringEndGapAtTemp',deck:'deckHeight',bearing:'bearingClearance',rod:'rodRatio',valve:'valvePistonSafety'};
+ function render(){m.querySelector('#engFields').innerHTML='<div class="two">'+fs[m.querySelector('#engType').value].map(x=>'<div class="field"><label>'+x[1]+'</label><input id="e_'+x[0]+'" type="number" step="any"></div>').join('')+'</div>'}
+ m.querySelector('#engType').onchange=render;render();
+ m.querySelector('#runEng').onclick=async()=>{try{const type=m.querySelector('#engType').value,o={};fs[type].forEach(x=>o[x[0]]=Number(m.querySelector('#e_'+x[0]).value));const out=NS.engineering[funcs[type]](o);m.querySelector('#engResult').textContent=JSON.stringify(out,null,2);const s=await state.sb.from('vehicle_calculations').insert({vehicle_id:vehicle.id,calculation_type:'mechanical_'+type,formula_version:out.formulaVersion||'engineering-v1',inputs:o,outputs:out,assumptions:{requiresOemSpec:type==='valve'},deterministic:true,created_by:state.user.id});if(s.error)throw s.error;toast0('Engineering calculation tersimpan')}catch(e){m.querySelector('#engResult').textContent='ERROR: '+e.message}};
+}
+
 function openLab(vehicle){
  const m=modal(`<div class="row between"><div><h3>🧮 Engineering Calculation Engine</h3><div class="small muted">Perhitungan deterministik • formula versioned • bukan estimasi AI</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="field"><label>Calculation</label><select id="calcType">
@@ -227,6 +248,7 @@ async function openExpertModal(){
  <button class="card" id="hubEvidence" style="text-align:left"><strong>📚 Evidence Engine</strong><div class="small muted">Source, claim, confidence & verification</div></button>
  <button class="card" id="hubMod" style="text-align:left"><strong>🔧 Modification Engineering</strong><div class="small muted">Compatibility, risk, baseline & test plan</div></button>
  <button class="card" id="hubValidation" style="text-align:left"><strong>✅ Validation Engine</strong><div class="small muted">Test result & acceptance record</div></button>
+ <button class="card" id="hubEngineering" style="text-align:left"><strong>⚙️ Mechanical Engineering Lab</strong><div class="small muted">Clearance, thermal expansion, deck, ring & bearing calculations</div></button>
  </div>
  <div class="card" style="margin-top:12px;background:#0f172a;color:#fff;box-shadow:none"><strong>AI Context Pipeline</strong><div class="small" style="opacity:.75;margin-top:6px">Vehicle → Configuration → Components → Modifications → Evidence → Measurements → Diagnostics → Calculations → Validation. AI hanya menerima context terstruktur; critical math tetap deterministic.</div></div>`);
  m.querySelector('[data-close]').onclick=()=>m.remove();
@@ -236,6 +258,7 @@ async function openExpertModal(){
  m.querySelector('#hubEvidence').onclick=()=>{m.remove();openEvidence(v)};
  m.querySelector('#hubMod').onclick=()=>{m.remove();openModification(v)};
  m.querySelector('#hubValidation').onclick=()=>{m.remove();openValidation(v)};
+ m.querySelector('#hubEngineering').onclick=()=>{m.remove();openEngineeringLab(v)};
 }
 
 function openInlineVoice(targetId){
@@ -245,6 +268,46 @@ function openInlineVoice(targetId){
  r.onerror=e=>toast0('Voice error: '+e.error);
  try{r.start()}catch(e){toast0('Voice sedang aktif atau browser menolak akses mic.')}
 }
+
+
+NS.engineering={
+ thermalExpansionMm({lengthMm,alphaPerC,deltaTempC}){const L=n(lengthMm),a=n(alphaPerC),d=n(deltaTempC);if(!(L>0&&a>=0))throw Error('Length dan coefficient wajib valid');return round(L*a*d,6)},
+ operatingBoreMm({coldBoreMm,boreAlphaPerC,referenceTempC,operatingTempC}){return round(n(coldBoreMm)*(1+n(boreAlphaPerC)*(n(operatingTempC)-n(referenceTempC))),6)},
+ operatingPistonMm({coldPistonMm,pistonAlphaPerC,referenceTempC,operatingTempC}){return round(n(coldPistonMm)*(1+n(pistonAlphaPerC)*(n(operatingTempC)-n(referenceTempC))),6)},
+ pistonWallClearance({coldBoreMm,coldPistonMm,boreAlphaPerC,pistonAlphaPerC,referenceTempC,operatingTempC}){
+  const bore=NS.engineering.operatingBoreMm({coldBoreMm,boreAlphaPerC,referenceTempC,operatingTempC});
+  const piston=NS.engineering.operatingPistonMm({coldPistonMm,pistonAlphaPerC,referenceTempC,operatingTempC});
+  return {coldClearanceMm:round(n(coldBoreMm)-n(coldPistonMm),6),operatingBoreMm:bore,operatingPistonMm:piston,operatingClearanceMm:round(bore-piston,6),formulaVersion:'thermal-piston-wall-v1'};
+ },
+ ringEndGapAtTemp({coldGapMm,ringAlphaPerC,ringDiameterMm,referenceTempC,operatingTempC}){
+  const d=n(ringDiameterMm),a=n(ringAlphaPerC),dt=n(operatingTempC)-n(referenceTempC);
+  if(!(d>0&&a>=0))throw Error('Ring diameter/coefficient wajib valid');
+  return {thermalGrowthMm:round(Math.PI*d*a*dt,6),estimatedGapMm:round(n(coldGapMm)+Math.PI*d*a*dt,6),formulaVersion:'thermal-ring-gap-v1'};
+ },
+ deckHeight({blockDeckHeightMm,headGasketCompressedMm,pistonCompressionHeightMm,rodLengthMm,strokeMm,pistonAboveDeckMm=0}){
+  const v=n(blockDeckHeightMm)+n(headGasketCompressedMm)-(n(pistonCompressionHeightMm)+n(rodLengthMm)+n(strokeMm)/2);
+  return {theoreticalPistonToDeckMm:round(v,4),measuredCorrectionMm:n(pistonAboveDeckMm),formulaVersion:'deck-height-v1'};
+ },
+ pistonSpeed({strokeMm,rpm}){return NS.calc.meanPistonSpeed({strokeMm,rpm})},
+ rodRatio({rodLengthMm,strokeMm}){const r=n(rodLengthMm),s=n(strokeMm);if(!(r>0&&s>0))throw Error('Rod length/stroke wajib > 0');return round(r/s,4)},
+ bearingClearance({journalDiameterMm,bearingBoreDiameterMm}){const j=n(journalDiameterMm),b=n(bearingBoreDiameterMm);if(!(j>0&&b>0))throw Error('Journal/bearing bore wajib > 0');return {clearanceMm:round(b-j,5),clearanceMicron:round((b-j)*1000,1),formulaVersion:'bearing-clearance-v1'}},
+ valvePistonSafety({measuredClearanceMm,minimumRequiredMm}){const m=n(measuredClearanceMm),r=n(minimumRequiredMm);return {marginMm:round(m-r,4),status:m>=r?'pass':'fail',requiresOemSpec:true,formulaVersion:'valve-piston-v1'}}
+};
+NS.maintenance={
+ predict({currentKm,lastServiceKm,intervalKm,currentDate,lastServiceDate,intervalMonths}){
+  const kmLeft=intervalKm==null?null:n(intervalKm)-Math.max(0,n(currentKm)-n(lastServiceKm));
+  let monthsLeft=null;
+  if(intervalMonths!=null&&lastServiceDate&&currentDate){const a=new Date(lastServiceDate),b=new Date(currentDate);monthsLeft=n(intervalMonths)-((b.getUTCFullYear()-a.getUTCFullYear())*12+b.getUTCMonth()-a.getUTCMonth())}
+  return {kmRemaining:kmLeft,monthsRemaining:monthsLeft,due:(kmLeft!=null&&kmLeft<=0)||(monthsLeft!=null&&monthsLeft<=0),formulaVersion:'maintenance-interval-v1'};
+ }
+};
+NS.health={
+ score({reliability=100,maintenance=100,diagnostics=100,telemetry=100,evidence=100,safety=100}){
+  const d={reliability:clamp(n(reliability),0,100),maintenance:clamp(n(maintenance),0,100),diagnostics:clamp(n(diagnostics),0,100),telemetry:clamp(n(telemetry),0,100),evidence:clamp(n(evidence),0,100),safety:clamp(n(safety),0,100)};
+  const score=round(d.reliability*.22+d.maintenance*.20+d.diagnostics*.18+d.telemetry*.12+d.evidence*.10+d.safety*.18,2);
+  return {score,grade:score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'E',dimensions:d,methodVersion:'vehicle-health-v1'};
+ }
+};
 
 window.VehicleLifebookCore=NS;
 window.openExpertModal=openExpertModal;

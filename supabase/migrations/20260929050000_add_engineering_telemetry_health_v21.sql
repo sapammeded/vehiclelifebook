@@ -1,0 +1,3 @@
+-- Vehicle Lifebook v2.1.0 — engineering / telemetry / maintenance / health
+-- Applied migration: add_engineering_telemetry_health_v21
+-- The canonical DDL is retained in Supabase migration history.
