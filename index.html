@@ -404,6 +404,7 @@ function renderAuth(){
    }catch(_){}
  };
  window.__welcomeVideoError=()=>{};
+ window.__welcomeVideoEnded=()=>{};
  welcomeVideo.addEventListener('loadedmetadata',startWelcomeVideo);
  welcomeVideo.addEventListener('canplay',startWelcomeVideo);
  welcomeVideo.addEventListener('playing',window.__welcomeVideoPlaying,{once:true});
