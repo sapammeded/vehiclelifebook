@@ -1,4 +1,4 @@
-name: Deploy Vehicle Lifebook to GitHub Pages
+name: Validate and Deploy Vehicle Lifebook
 
 on:
   push:
@@ -15,7 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate frontend JavaScript syntax
+        run: node scripts/validate-index.mjs
+
   deploy:
+    needs: validate
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -23,15 +36,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: "."
-
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
