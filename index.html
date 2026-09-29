@@ -329,17 +329,20 @@ async function exportDocx(images=[]){
 }
 
 async function boot(){
+  // Render the welcome gate immediately. Do not wait for Supabase/session initialization.
+  // This prevents the first-load video from being created late and appearing as a black panel.
+  renderAuth();
   try{
     state.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     const {data:{session}}=await state.sb.auth.getSession();
-    // Always show the public welcome gate first, even when a previous session exists.
     state.user=session?.user||null;
-    renderAuth();
+    if(state.user) await afterLogin();
     state.sb.auth.onAuthStateChange(async(_e,session)=>{
       state.user=session?.user||null;
-      if(state.user) await afterLogin(); else renderAuth();
+      if(state.user) await afterLogin();
+      else if(_e!=='INITIAL_SESSION') renderAuth();
     });
-  }catch(e){renderAuth();toast('Gagal menginisialisasi aplikasi: '+e.message)}
+  }catch(e){toast('Gagal menginisialisasi aplikasi: '+e.message)}
 }
 
 function renderSetup(msg=''){
