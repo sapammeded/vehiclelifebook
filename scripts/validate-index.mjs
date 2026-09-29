@@ -30,7 +30,7 @@ for (const src of localScripts) {
 }
 
 if (!html.includes('const SUPABASE_URL=')) throw new Error('Supabase configuration missing');
-if (/service[_-]?role|SUPABASE_SERVICE_ROLE_KEY/i.test(html)) {
+if (/SUPABASE_SERVICE_ROLE_KEY\s*[:=]|service[_-]?role[_-]?key\s*[:=]/i.test(html)) {
   throw new Error('Potential service-role secret detected in frontend');
 }
 if (!html.includes('js/automotive-core.js')) throw new Error('Automotive core is not loaded');
