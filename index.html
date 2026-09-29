@@ -32,7 +32,7 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:80;display:grid;place-items:end center;padding:10px}.sheet{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;padding:18px}.voice{border:2px dashed #bfdbfe;background:#eff6ff;padding:14px;border-radius:16px}.pulse{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.5}}
 .badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:700;background:#f1f5f9}.success{color:#047857;background:#d1fae5}.warning{color:#92400e;background:#fef3c7}
 .pro{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:0}
-.voice-status{font-size:11px;color:#64748b}.photo-thumb{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.voice-status{font-size:11px;color:#64748b}.media-strip{display:flex;gap:6px;align-items:center;overflow:auto;margin-top:9px}.event-photo-thumb{width:54px;height:54px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}.photo-more{font-size:12px;color:#64748b}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.media-card{position:relative}.media-card img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;border:1px solid var(--line)}.media-delete{width:100%;margin-top:4px;font-size:11px}.media-missing{height:100px;display:grid;place-items:center;background:#f1f5f9;border-radius:10px;font-size:11px;color:#64748b}.photo-thumb{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .promptbox{background:#0b1220;color:#e2e8f0;border-radius:16px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:48vh;overflow:auto}
 .section-title{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:18px 0 8px}
 .landing{min-height:100vh;display:grid;place-items:center;padding:18px;background:radial-gradient(circle at 15% 10%,#243b6b 0,#0b1220 42%,#050811 100%);color:#fff}
@@ -400,9 +400,24 @@ async function loadVehicles(){
  if(state.selected&&!state.vehicles.some(v=>v.id===state.selected))state.selected=state.vehicles[0]?.id||null;
  if(state.selected)await loadEvents();
 }
+async function loadEventMedia(){
+ if(!state.selected)return;
+ const {data,error}=await state.sb.from('vehicle_media').select('id,vehicle_id,event_id,storage_path,file_name,mime_type,file_size,caption,metadata,created_at').eq('vehicle_id',state.selected).order('created_at',{ascending:true});
+ if(error){toast(error.message);state.mediaByEvent={};return}
+ state.mediaByEvent={};
+ for(const row of (data||[])){
+   if(!state.mediaByEvent[row.event_id])state.mediaByEvent[row.event_id]=[];
+   try{
+     const {data:signed,error:se}=await state.sb.storage.from('vehicle-evidence').createSignedUrl(row.storage_path,3600);
+     row.signed_url=se?null:signed?.signedUrl||null;
+   }catch{row.signed_url=null}
+   state.mediaByEvent[row.event_id].push(row);
+ }
+}
 async function loadEvents(){
  const {data,error}=await state.sb.from('vehicle_timeline').select('*').eq('vehicle_id',state.selected).order('event_date',{ascending:false}).order('created_at',{ascending:false});
- if(error){toast(error.message);return}state.events=data||[];
+ if(error){toast(error.message);return}
+ state.events=data||[];await loadEventMedia();
 }
 
 function renderApp(){
@@ -433,7 +448,7 @@ function renderApp(){
  const exportBtn=$('#exportBtn'); if(exportBtn) exportBtn.onclick=()=>openExportModal();
  const addEvent=$('#addEvent'); if(addEvent) addEvent.onclick=()=>openEventModal();
  const globalAutoBtn=$('#globalAutoBtn'); if(globalAutoBtn) globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
- document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
+ document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});document.querySelectorAll('[data-event-media]').forEach(b=>b.onclick=()=>openEventMediaModal(b.dataset.eventMedia));
 }
 
 function vehicleSection(v){
@@ -441,9 +456,64 @@ function vehicleSection(v){
  return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><div class="row"><button class="btn ghost" id="globalAutoBtn">🧠 Global Automotive</button><button class="btn primary" id="addEvent">+ Aktivitas</button></div></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
  <div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Timeline</h3><input id="eventSearch" style="max-width:220px" placeholder="Cari aktivitas..."></div><div id="timeline" style="margin-top:12px">${timelineHtml(state.events)}</div></div></section>`;
 }
+function mediaCount(eventId){return (state.mediaByEvent?.[eventId]||[]).length}
+function mediaThumbsHtml(eventId){
+ const media=state.mediaByEvent?.[eventId]||[];
+ if(!media.length)return '';
+ return '<div class="media-strip">'+media.slice(0,8).map(x=>x.signed_url?'<img class="event-photo-thumb" src="'+esc(x.signed_url)+'" alt="'+esc(x.file_name||'Foto aktivitas')+'">':'').join('')+(media.length>8?'<span class="photo-more">+'+(media.length-8)+'</span>':'')+'</div>';
+}
+function openEventMediaModal(eventId){
+ const e=state.events.find(x=>x.id===eventId);if(!e)return;
+ const m=modal('<div class="row between"><div><h3>📷 Foto aktivitas</h3><div class="small muted">'+esc(e.event_date+' · '+e.title)+'</div></div><button class="btn gray" data-close>✕</button></div>'+
+ '<div class="card" style="margin-top:12px;background:#f8fafc;box-shadow:none"><div class="small muted">Foto tersimpan untuk aktivitas ini</div><div id="eventMediaGrid" class="media-grid" style="margin-top:10px"></div></div>'+
+ '<div class="field" style="margin-top:12px"><label>Tambah foto — bebas berapa saja</label><input id="eventPhotos" type="file" accept="image/*" multiple><input id="eventCamera" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraBtn" type="button">📷 Kamera</button><span id="eventPhotoCount" class="small muted">Belum ada foto baru</span></div></div>'+
+ '<button class="btn primary" style="width:100%" id="uploadEventPhotos">⬆️ Simpan Foto ke Aktivitas</button>');
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ let selected=[];
+ const render=()=>{
+   const old=state.mediaByEvent?.[eventId]||[],grid=m.querySelector('#eventMediaGrid');
+   grid.innerHTML=(old.length?old.map(x=>'<div class="media-card">'+(x.signed_url?'<img src="'+esc(x.signed_url)+'" alt="'+esc(x.file_name||'Foto')+'">':'<div class="media-missing">Foto tidak tersedia</div>')+'<button class="btn gray media-delete" data-media="'+esc(x.id)+'" type="button">Hapus</button></div>').join(''):'<div class="small muted">Belum ada foto.</div>');
+   grid.querySelectorAll('[data-media]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus foto ini dari aktivitas?'))return;setBusy(true);try{const id=b.dataset.media,row=old.find(x=>x.id===id);if(row)await state.sb.storage.from('vehicle-evidence').remove([row.storage_path]);const {error}=await state.sb.from('vehicle_media').delete().eq('id',id);if(error)throw error;await loadEventMedia();render();renderApp()}catch(err){toast(err.message||'Gagal menghapus foto')}finally{setBusy(false)}});
+ };
+ render();
+ const add=list=>{selected.push(...Array.from(list||[]).filter(f=>/^image\\//i.test(f.type)));m.querySelector('#eventPhotoCount').textContent=selected.length+' foto baru dipilih'};
+ m.querySelector('#eventPhotos').onchange=e=>add(e.target.files);
+ m.querySelector('#eventCameraBtn').onclick=()=>m.querySelector('#eventCamera').click();
+ m.querySelector('#eventCamera').onchange=e=>add(e.target.files);
+ m.querySelector('#uploadEventPhotos').onclick=async()=>{
+   if(!selected.length){toast('Pilih foto dulu');return}
+   setBusy(true);let ok=0,fail=0;
+   try{
+     for(let n=0;n<selected.length;n++){
+       const file=selected[n];
+       try{
+         const packed=await compressMediaFile(file);
+         const ext='jpg',path=state.user.id+'/'+state.selected+'/'+eventId+'/'+crypto.randomUUID()+'.'+ext;
+         const up=await state.sb.storage.from('vehicle-evidence').upload(path,packed.blob,{contentType:'image/jpeg',upsert:false});
+         if(up.error)throw up.error;
+         const ins=await state.sb.from('vehicle_media').insert({vehicle_id:state.selected,event_id:eventId,uploaded_by:state.user.id,storage_path:path,file_name:file.name,mime_type:'image/jpeg',file_size:packed.blob.size,caption:null,metadata:{original_type:file.type,original_size:file.size,width:packed.width,height:packed.height}});
+         if(ins.error){await state.sb.storage.from('vehicle-evidence').remove([path]);throw ins.error}
+         ok++;
+       }catch(err){fail++;console.error(err)}
+     }
+     await loadEventMedia();render();m.querySelector('#eventPhotoCount').textContent=fail?ok+' tersimpan • '+fail+' gagal':ok+' foto tersimpan';toast(fail?'Sebagian foto gagal disimpan':'Semua foto tersimpan');
+   }finally{setBusy(false)}
+ };
+}
+async function compressMediaFile(file){
+ return new Promise((resolve,reject)=>{
+   const reader=new FileReader();reader.onerror=()=>reject(reader.error||new Error('Gagal membaca foto'));reader.onload=()=>{
+     const img=new Image();img.onload=()=>{
+       const max=1800,scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height)),width=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),height=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0,width,height);
+       canvas.toBlob(blob=>blob?resolve({blob,width,height}):reject(new Error('Gagal mengompres foto')),'image/jpeg',.84);
+     };img.onerror=()=>reject(new Error('Format foto tidak bisa dibaca'));img.src=reader.result;
+   };reader.readAsDataURL(file);
+ });
+}
 function timelineHtml(events){
  if(!events.length)return '<div class="empty">Belum ada aktivitas untuk kendaraan ini.</div>';
- return events.map(e=>`<article class="card event" style="margin-bottom:9px;box-shadow:none"><div class="row between"><div><div class="type">${esc(e.event_type)}</div><strong>${esc(e.title)}</strong></div><span class="cost">${rupiah(e.total_cost)}</span></div><div class="small muted" style="margin-top:6px">${esc(e.event_date)} ${e.odometer!=null?' · '+Number(e.odometer).toLocaleString('id-ID')+' km':''}</div>${e.description?'<div style="margin-top:7px">'+esc(e.description)+'</div>':''}${e.raw_input?'<div class="small muted" style="margin-top:7px">Voice: '+esc(e.raw_input)+'</div>':''}</article>`).join('');
+ return events.map(e=>`<article class="card event" style="margin-bottom:9px;box-shadow:none"><div class="row between"><div><div class="type">${esc(e.event_type)}</div><strong>${esc(e.title)}</strong></div><span class="cost">${rupiah(e.total_cost)}</span></div><div class="small muted" style="margin-top:6px">${esc(e.event_date)} ${e.odometer!=null?' · '+Number(e.odometer).toLocaleString('id-ID')+' km':''}</div>${e.description?'<div style="margin-top:7px">'+esc(e.description)+'</div>':''}${e.raw_input?'<div class="small muted" style="margin-top:7px">Voice: '+esc(e.raw_input)+'</div>':''}${mediaThumbsHtml(e.id)}<div class="row" style="margin-top:9px"><button class="btn gray" type="button" data-event-media="${esc(e.id)}">📷 Foto (${mediaCount(e.id)})</button></div></article>`).join('');
 }
 
 function modal(inner){
@@ -480,7 +550,7 @@ function openEventModal(prefill={}){
  <div class="field"><label>Judul *</label><input id="eTitle" value="${esc(prefill.title||'')}" placeholder="Contoh: Ganti oli + filter oli"></div>
  <div class="two"><div class="field"><label>Biaya (Rp)</label><input id="eCost" type="number" min="0" value="${prefill.cost??''}"></div><div class="field"><label>Odometer (km)</label><input id="eOdo" type="number" min="0" value="${prefill.odometer??''}"></div></div>
  <div class="field"><div class="row between"><label>Deskripsi</label><button class="btn gray" type="button" id="voiceEvent">🎙️ Voice</button></div><textarea id="eDesc" placeholder="Detail pekerjaan, kondisi, atau catatan">${esc(prefill.description||'')}</textarea><div id="eventVoiceStatus" class="small muted" style="margin-top:5px">Voice siap • bisa bicara terus sampai Anda menekan Stop.</div></div>
- <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
+ <div class="field" style="margin-top:12px"><div class="row between"><label>Foto aktivitas</label><span id="newEventPhotoCount" class="small muted">Belum ada foto</span></div><input id="eventPhotosNew" type="file" accept="image/*" multiple><input id="eventCameraNew" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" id="eventCameraNewBtn" type="button">📷 Kamera</button></div><div class="small muted" style="margin-top:5px">Bebas berapa saja. Foto dikompres lokal lalu disimpan sebagai evidence aktivitas.</div></div> <div class="small muted" style="margin-bottom:10px">Untuk servis/BBM/kerusakan, detail tambahan akan dikembangkan di modul berikutnya. Data inti tetap dicatat aman ke timeline.</div>
  <button class="btn primary" style="width:100%" id="saveEvent">Simpan aktivitas</button>`);
  m.querySelector('#eType').value=prefill.type||'service';m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceEvent').onclick=()=>openInlineVoice('eDesc','voiceEvent','eventVoiceStatus');
  m.querySelector('#saveEvent').onclick=async()=>{
@@ -489,7 +559,18 @@ function openEventModal(prefill={}){
   if(cost<0||(odo!=null&&odo<0)){toast('Nilai biaya/odometer tidak valid');return}
   setBusy(true);try{
    const {data,error}=await state.sb.rpc('create_vehicle_event',{p_vehicle_id:state.selected,p_event_type:m.querySelector('#eType').value,p_event_date:m.querySelector('#eDate').value,p_title:title,p_description:m.querySelector('#eDesc').value.trim()||null,p_total_cost:cost,p_odometer:odo,p_source:prefill.source||'manual',p_raw_input:prefill.raw_input||null,p_metadata:{},p_detail:{}});
-   if(error)throw error;closeModal(m);await loadVehicles();renderApp();toast('Aktivitas tersimpan');
+   if(error)throw error;
+   const eventId=data?.id||data?.event_id||data?.[0]?.id||data?.[0]?.event_id;
+   const files=Array.from(m.querySelector('#eventPhotosNew').files||[]);
+   if(!eventId){toast('Aktivitas tersimpan, tetapi ID aktivitas tidak ditemukan untuk foto');closeModal(m);await loadVehicles();renderApp();return}
+   let ok=0,fail=0;
+   for(const file of files){try{
+     const packed=await compressMediaFile(file),path=state.user.id+'/'+state.selected+'/'+eventId+'/'+crypto.randomUUID()+'.jpg';
+     const up=await state.sb.storage.from('vehicle-evidence').upload(path,packed.blob,{contentType:'image/jpeg',upsert:false});if(up.error)throw up.error;
+     const ins=await state.sb.from('vehicle_media').insert({vehicle_id:state.selected,event_id:eventId,uploaded_by:state.user.id,storage_path:path,file_name:file.name,mime_type:'image/jpeg',file_size:packed.blob.size,metadata:{original_type:file.type,original_size:file.size,width:packed.width,height:packed.height}});
+     if(ins.error){await state.sb.storage.from('vehicle-evidence').remove([path]);throw ins.error}ok++;
+   }catch(err){fail++;console.error(err)}}
+   closeModal(m);await loadVehicles();renderApp();toast(files.length?(fail?ok+' foto tersimpan • '+fail+' gagal':'Aktivitas + '+ok+' foto tersimpan'):'Aktivitas tersimpan');
   }catch(e){toast(e.message||'Gagal menyimpan aktivitas')}finally{setBusy(false)}
  };
 }
