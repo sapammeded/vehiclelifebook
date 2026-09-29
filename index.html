@@ -350,18 +350,12 @@ function renderSetup(msg=''){
 function renderAuth(){
  $('#app').innerHTML=`<main class="landing"><div class="landing-shell">
  <section class="welcome-video" id="welcomePanel">
-   <video id="welcomeVideo" autoplay muted playsinline preload="auto" webkit-playsinline onloadeddata="window.__welcomeVideoReady&&window.__welcomeVideoReady()" oncanplay="window.__welcomeVideoReady&&window.__welcomeVideoReady()" onplay="window.__welcomeVideoPlaying&&window.__welcomeVideoPlaying()" onended="focusAuthGate()" onerror="window.__welcomeVideoError&&window.__welcomeVideoError()">
-     <source src="https://cdn.jsdelivr.net/gh/sapammeded/vehiclelifebook@main/assets/welcome/welcome.mp4" type="video/mp4">
-     <source src="${WELCOME_VIDEO}" type="video/mp4">
+   <video id="welcomeVideo" autoplay playsinline preload="auto" webkit-playsinline onloadeddata="window.__welcomeVideoReady&&window.__welcomeVideoReady()" oncanplay="window.__welcomeVideoReady&&window.__welcomeVideoReady()" onplay="window.__welcomeVideoPlaying&&window.__welcomeVideoPlaying()" onended="focusAuthGate()" onerror="window.__welcomeVideoError&&window.__welcomeVideoError()">
+     <source src="./assets/welcome/welcome.mp4?v=20260930" type="video/mp4">
+     <source src="https://cdn.jsdelivr.net/gh/sapammeded/vehiclelifebook@main/assets/welcome/welcome.mp4?v=20260930" type="video/mp4">
    </video>
-   <button class="video-play" id="playWelcome" type="button" aria-label="Putar video">▶</button>
-   <span class="video-hint" id="videoHint">Video welcome · tap ▶ jika belum mulai</span>
    <button class="video-skip" id="skipWelcome" type="button">Skip →</button>
-   <div class="video-overlay">
-     <span class="video-badge">Vehicle Lifebook</span>
-     <h1 style="font-size:clamp(28px,5vw,48px);line-height:1.05;margin:10px 0 6px">AUTOMOTIVE MASTER<br>INTELLIGENCE</h1>
-     <div style="color:#cbd5e1;font-size:12px;max-width:560px">Your vehicle. Your data. Your complete life history.</div>
-   </div>
+v>
  </section>
  <section class="landing-auth" id="authGate">
    <div class="landing-logo"><div class="landing-logo-mark">🚘</div><div><div style="font-weight:700;font-size:20px">Vehicle Lifebook</div><div class="small muted">Automotive Master Intelligence</div></div></div>
@@ -380,16 +374,31 @@ function renderAuth(){
  const focusAuth=()=>focusAuthGate();
  window.focusAuthGate=()=>focusAuthGate();
  function focusAuthGate(){const gate=document.getElementById('authGate');if(gate){gate.scrollIntoView({behavior:'smooth',block:'start'});const email=document.getElementById('email');if(email)setTimeout(()=>email.focus(),350)}}
- const welcomeVideo=document.getElementById('welcomeVideo'),playWelcome=document.getElementById('playWelcome'),videoHint=document.getElementById('videoHint');
- function setVideoReady(){if(videoHint)videoHint.textContent='';}
- function setVideoPlaying(){if(playWelcome)playWelcome.classList.add('hidden');if(videoHint)videoHint.classList.add('hidden');}
- function tryWelcomePlay(){if(!welcomeVideo)return;welcomeVideo.muted=true;const p=welcomeVideo.play();if(p&&p.catch)p.catch(()=>{if(playWelcome)playWelcome.classList.remove('hidden');if(videoHint)videoHint.classList.remove('hidden')})}
- window.__welcomeVideoReady=()=>{setVideoReady();tryWelcomePlay()};
- window.__welcomeVideoPlaying=()=>setVideoPlaying();
- window.__welcomeVideoError=()=>{if(playWelcome)playWelcome.classList.remove('hidden');if(videoHint){videoHint.textContent='Tap ▶ untuk memutar video';videoHint.classList.remove('hidden')}};
- playWelcome.onclick=tryWelcomePlay;
- welcomeVideo.onclick=()=>{if(welcomeVideo.paused)tryWelcomePlay()};
- setTimeout(tryWelcomePlay,120);
+ const welcomeVideo=document.getElementById('welcomeVideo');
+ function tryWelcomePlay(){
+   if(!welcomeVideo)return;
+   welcomeVideo.muted=false;
+   welcomeVideo.volume=1;
+   const p=welcomeVideo.play();
+   if(p&&p.catch)p.catch(()=>{
+     welcomeVideo.muted=true;
+     const fallback=welcomeVideo.play();
+     if(fallback&&fallback.catch)fallback.catch(()=>{});
+   });
+ }
+ function enableWelcomeAudio(){
+   if(!welcomeVideo)return;
+   welcomeVideo.muted=false;
+   welcomeVideo.volume=1;
+   const p=welcomeVideo.play();
+   if(p&&p.catch)p.catch(()=>{});
+ }
+ window.__welcomeVideoReady=()=>tryWelcomePlay();
+ window.__welcomeVideoPlaying=()=>{};
+ window.__welcomeVideoError=()=>{};
+ document.addEventListener('pointerdown',enableWelcomeAudio,{once:true,passive:true});
+ document.addEventListener('touchstart',enableWelcomeAudio,{once:true,passive:true});
+ setTimeout(tryWelcomePlay,80);
  document.getElementById('skipWelcome').onclick=()=>{if(welcomeVideo)welcomeVideo.pause();focusAuthGate()};
  document.getElementById('login').onclick=()=>auth('login');document.getElementById('signup').onclick=()=>auth('signup');document.getElementById('reset').onclick=resetPassword;
 }
