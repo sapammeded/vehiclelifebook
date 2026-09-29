@@ -445,7 +445,7 @@ NS.oem={
   },
   buildEngineeringMission(vehicle,question,specContext){
     const g=this.missionClassify(question), specs=specContext?.specs||[];
-    const required=[...new Set((g.domains||[]).flatMap(d=>this.domainMap[d]||[]))];
+    const required=[...new Set((g.domains||[]).flatMap(d=>this.domainMap[d]||this.domainMap[d==='engine'?'engine_build':d]||[]))];
     required.push('baseline_specs','target_configuration','compatibility','system_loads','thermal_limits','validation_limits');
     const verified=new Set(specs.filter(x=>x.verification_status==='verified').map(x=>x.spec_key));
     const criticalUnknowns=[...new Set(required.filter(k=>this.isCritical(k)&&!verified.has(k)))];
