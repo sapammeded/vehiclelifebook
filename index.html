@@ -673,15 +673,28 @@ function parseVoice(text){
  return out;
 }
 function openVoiceModal(){
- const m=modal(`<div class="row between"><h3>🎙️ Voice-first recording</h3><button class="btn gray" data-close>✕</button></div>
- <div class="voice"><div class="small muted">Contoh</div><strong>“Hari ini servis ganti oli habis 350 ribu.”</strong><div class="small muted" style="margin-top:6px">Tekan Mulai untuk bicara. Tidak ada timer aplikasi dan user sendiri yang menekan Stop. Jika browser memutus sesi recognition, engine mencoba menyambung kembali otomatis.</div></div>
+ const m=modal(`<div class="row between"><h3>🎙️ Input suara</h3><button class="btn gray" data-close>✕</button></div>
+ <div class="voice"><div class="small muted">Contoh</div><strong>“Hari ini servis ganti oli habis 350 ribu.”</strong><div class="small muted" style="margin-top:6px">Voice → transkrip → ekstraksi → preview → konfirmasi. Tidak langsung disimpan.</div></div>
  <div class="row" style="margin-top:12px"><button class="btn primary" id="startVoice">🎙️ Mulai bicara</button><span id="voiceStatus" class="small muted">Siap.</span></div>
- <div class="field" style="margin-top:12px"><label>Transkrip / teks</label><textarea id="voiceText" style="min-height:180px" placeholder="Atau ketik kalimat secara manual..."></textarea></div>
+ <div class="field" style="margin-top:12px"><label>Transkrip / teks</label><textarea id="voiceText" placeholder="Atau ketik kalimat secara manual..."></textarea></div>
  <button class="btn ghost" style="width:100%" id="parseVoice">Analisis & Preview</button>
  <div id="voicePreview" style="margin-top:12px"></div>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
- m.querySelector('#startVoice').onclick=()=>openInlineVoice('voiceText','startVoice','voiceStatus');
- m.querySelector('#parseVoice').onclick=()=>{const text=m.querySelector('#voiceText').value.trim();if(!text){toast('Belum ada suara/teks');return}const p=parseVoice(text);m.querySelector('#voicePreview').innerHTML=`<div class="card" style="box-shadow:none;background:#f8fafc"><div class="row between"><strong>Preview</strong><span class="badge warning">Belum disimpan</span></div><div class="two" style="margin-top:10px"><div><div class="small muted">Jenis</div><strong>${esc(p.type)}</strong></div><div><div class="small muted">Tanggal</div><strong>${esc(p.date)}</strong></div><div><div class="small muted">Judul</div><strong>${esc(p.title)}</strong></div><div><div class="small muted">Biaya</div><strong>${rupiah(p.cost)}</strong></div></div><div style="margin-top:10px" class="small">${esc(p.description)}</div><button class="btn primary" style="width:100%;margin-top:12px" id="confirmVoice">Konfirmasi & simpan</button></div>`;m.querySelector('#confirmVoice').onclick=()=>{closeModal(m);openEventModal(p)}};
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){m.querySelector('#startVoice').disabled=true;m.querySelector('#voiceStatus').textContent='Browser ini tidak mendukung Speech Recognition. Gunakan teks.'}
+ else{
+  const r=new SR();r.lang='id-ID';r.interimResults=true;r.continuous=false;
+  r.onstart=()=>{m.querySelector('#voiceStatus').textContent='Mendengarkan…';m.querySelector('#startVoice').classList.add('pulse')};
+  r.onend=()=>{m.querySelector('#voiceStatus').textContent='Selesai.';m.querySelector('#startVoice').classList.remove('pulse')};
+  r.onerror=e=>m.querySelector('#voiceStatus').textContent='Voice error: '+e.error;
+  r.onresult=e=>{let s='';for(let i=e.resultIndex;i<e.results.length;i++)s+=e.results[i][0].transcript;m.querySelector('#voiceText').value=s};
+  m.querySelector('#startVoice').onclick=()=>{try{r.start()}catch{}};
+ }
+ m.querySelector('#parseVoice').onclick=()=>{
+  const text=m.querySelector('#voiceText').value.trim();if(!text){toast('Belum ada suara/teks');return}
+  const p=parseVoice(text);m.querySelector('#voicePreview').innerHTML=`<div class="card" style="box-shadow:none;background:#f8fafc"><div class="row between"><strong>Preview</strong><span class="badge warning">Belum disimpan</span></div><div class="two" style="margin-top:10px"><div><div class="small muted">Jenis</div><strong>${esc(p.type)}</strong></div><div><div class="small muted">Tanggal</div><strong>${esc(p.date)}</strong></div><div><div class="small muted">Judul</div><strong>${esc(p.title)}</strong></div><div><div class="small muted">Biaya</div><strong>${rupiah(p.cost)}</strong></div></div><div style="margin-top:10px" class="small">${esc(p.description)}</div><button class="btn primary" style="width:100%;margin-top:12px" id="confirmVoice">Konfirmasi & simpan</button></div>`;
+  m.querySelector('#confirmVoice').onclick=()=>{closeModal(m);openEventModal(p)};
+ };
 }
 
 function makeLicenseCode(){
