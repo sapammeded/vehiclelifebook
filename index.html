@@ -268,14 +268,25 @@ function openExpertModal(){
  const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
  const m=modal(`<div class="row between"><div><h3 style="margin:0">💎 Automotive Expert</h3><div class="small muted">Universal Expert Prompt Engine</div></div><button class="btn gray" data-close>✕</button></div>
  <div class="pro card" style="margin-top:12px"><strong>Tanya apa saja tentang kendaraan ini.</strong><div class="small" style="margin-top:5px;opacity:.9">Diagnosis · modifikasi · racing · styling · spare part · performa · risiko · maintenance</div></div>
- <div class="field" style="margin-top:12px"><div class="row between"><label>Pertanyaan Anda</label><button class="btn gray" type="button" id="voiceExpert">🎙️ Voice</button></div><textarea id="expertQ" style="min-height:130px" placeholder="Ketik atau gunakan Voice."></textarea><div id="expertVoiceStatus" class="small muted" style="margin-top:5px">Voice siap • tekan Voice untuk mulai, tekan lagi untuk berhenti.</div></div>
+ <div class="field" style="margin-top:12px"><div class="row between"><label>Mode bantuan</label><span class="small muted">Universal • semua kendaraan</span></div><div class="row" style="margin-top:7px"><button class="btn primary" type="button" id="expertBeginner">👤 Awam</button><button class="btn gray" type="button" id="expertTechnical">🔧 Teknis</button></div><div id="expertModeHint" class="small muted" style="margin-top:7px">Mode Awam aktif: Anda tidak perlu memahami istilah mesin. Expert akan menuntun Anda langkah demi langkah.</div></div>
+ <div class="field" style="margin-top:12px"><div class="row between"><label>Pertanyaan Anda</label><button class="btn gray" type="button" id="voiceExpert">🎙️ Voice</button></div><textarea id="expertQ" style="min-height:130px" placeholder="Contoh: Motor saya standar, saya mau dibuat drag. Saya awam, tolong tuntun dari nol."></textarea><div id="expertVoiceStatus" class="small muted" style="margin-top:5px">Voice siap • tekan Voice untuk mulai, tekan lagi untuk berhenti.</div></div>
  <div class="small muted">Gunakan prompt ini di AI pilihan Anda untuk mendapatkan analisis otomotif mendalam berdasarkan kendaraan dan riwayatnya.</div>
  <button class="btn primary" style="width:100%;margin-top:12px" id="makePrompt">⚡ Buat Expert Prompt</button>
  <div id="expertResult" style="margin-top:12px"></div>`);
- m.querySelector('[data-close]').onclick=()=>closeModal(m);m.querySelector('#voiceExpert').onclick=()=>openInlineVoice('expertQ','voiceExpert','expertVoiceStatus');
+ let expertMode='beginner';
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#voiceExpert').onclick=()=>openInlineVoice('expertQ','voiceExpert','expertVoiceStatus');
+ const setExpertMode=mode=>{
+   expertMode=mode;
+   const b=m.querySelector('#expertBeginner'),t=m.querySelector('#expertTechnical'),h=m.querySelector('#expertModeHint');
+   b.className='btn '+(mode==='beginner'?'primary':'gray');t.className='btn '+(mode==='technical'?'primary':'gray');
+   h.textContent=mode==='beginner'?'Mode Awam aktif: Anda tidak perlu memahami istilah mesin. Expert akan menuntun Anda langkah demi langkah.':'Mode Teknis aktif: detail engineering, parameter, asumsi dan validasi ditampilkan lebih lengkap.';
+ };
+ m.querySelector('#expertBeginner').onclick=()=>setExpertMode('beginner');
+ m.querySelector('#expertTechnical').onclick=()=>setExpertMode('technical');
  m.querySelector('#makePrompt').onclick=()=>{
    const q=m.querySelector('#expertQ').value.trim();if(!q){toast('Tulis pertanyaan dulu');return}
-   const p=buildExpertPrompt(q,v);
+   const p=buildExpertPrompt(q,v,null,expertMode);
    m.querySelector('#expertResult').innerHTML=`<div class="row between"><strong>Prompt siap digunakan</strong><span class="badge success">PRO</span></div><div class="promptbox" id="promptText" style="margin-top:8px"></div><button class="btn primary" style="width:100%;margin-top:10px" id="copyPrompt">📋 Salin Prompt</button>`;
    m.querySelector('#promptText').textContent=p;
    m.querySelector('#copyPrompt').onclick=async()=>{try{await navigator.clipboard.writeText(p);toast('Prompt berhasil disalin')}catch{const ta=document.createElement('textarea');ta.value=p;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Prompt berhasil disalin')}};
