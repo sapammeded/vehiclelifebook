@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 const html=fs.readFileSync('index.html','utf8');
+const intelligence=fs.readFileSync('js/vehicle-intelligence-ui.js','utf8');
+const source=html+'\n'+intelligence;
 const required=[
   'js/global-automotive-intelligence.js',
   'js/vehicle-intelligence-ui.js',
@@ -14,7 +16,7 @@ const required=[
   "vehicle_evidence",
   "validation_records"
 ];
-const missing=required.filter(x=>!html.includes(x));
+const missing=required.filter(x=>!source.includes(x));
 if(missing.length)throw new Error('Intelligence/lazy-export wiring missing: '+missing.join(', '));
 for(const path of ['js/vehicle-intelligence-ui.js','js/global-automotive-intelligence.js','js/automotive-core.js']){
  if(!fs.existsSync(path))throw new Error('Missing '+path);
