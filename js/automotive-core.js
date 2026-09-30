@@ -118,6 +118,35 @@ const architectureTestMap={
 };
 function architectureContext(vehicle){const v=vehicle||{};const identity=[v.brand,v.model,v.variant,v.vehicle_type,v.vehicle_class].filter(Boolean).join(' ').toLowerCase();let engine=String(v.engine_type||'').toLowerCase(),trans=String(v.transmission_type||'').toLowerCase(),type=String(v.vehicle_type||'').toLowerCase(),cls=String(v.vehicle_class||'').toLowerCase();if(!engine&&/(pcx|nmax|aerox|vario|scoopy|beat|adv|vespa|scooter|matic)/.test(identity))engine='gasoline_ice';if(!trans&&/(pcx|nmax|aerox|vario|scoopy|beat|adv|vespa|scooter|matic)/.test(identity))trans='cvt';if(!type&&/(pcx|nmax|aerox|vario|scoopy|beat|adv|vespa|scooter)/.test(identity))type='scooter';return {engine,trans,vehicle:type,cls,inference:(engine==='gasoline_ice'||trans==='cvt'||type==='scooter')?'identity_inferred':'explicit_or_unknown'};}
 NS.diagnose=(symptom,conditions='',vehicle={})=>{const text=String(symptom||'')+' '+String(conditions||'');const a=architectureContext(vehicle); const ua=universalArchitecture(vehicle);let hypotheses=[];const launch=launchRules.find(x=>x.re.test(text));if(launch){const ev=a.engine.includes('ev')||a.engine.includes('electric')||a.engine.includes('bev');const hv=a.engine.includes('hybrid')||a.engine.includes('phev');const cvt=/cvt|scooter|matic/.test(a.trans+' '+a.vehicle+' '+a.cls);const order=ev?['Air / Throttle / Control','Transmission / Drivetrain','Ignition / Combustion']:hv?['Transmission / Drivetrain','Air / Throttle / Control','Electrical / Network / ECU']:cvt?['Transmission / Drivetrain','Air / Throttle / Control','Ignition / Combustion']:launch.systems;hypotheses=order.map((system,i)=>({system,priority:i===0?'high':'investigate',status:'hypothesis_only',reason:'Symptom pattern requires testing; architecture and measurements are not sufficient to confirm root cause.',tests:(architectureTestMap[system]||launch.tests)}));}else{const tests=[{system:'Fuel / Delivery',priority:3,keywords:/bensin|fuel|injector|fuel pressure/i},{system:'Ignition / Combustion',priority:3,keywords:/misfire|brebet|pincang|busi|coil|pengapian/i},{system:'Air / Throttle / Control',priority:2,keywords:/idle|langsam|throttle|gas|ngempos|hesit|tersendat/i},{system:'Cooling / Thermal',priority:3,keywords:/overheat|panas|coolant|radiator|temperature/i},{system:'Lubrication / Mechanical',priority:3,keywords:/oli|oil|compression|bunyi mesin|knocking/i},{system:'Transmission / Drivetrain',priority:2,keywords:/cvt|roller|variator|belt|kopling|clutch|selip|slip|transmisi|gearbox|dct|amt/i},{system:'Brake / Chassis',priority:1,keywords:/rem|brake|steering|setir|suspensi|shock|ban|tire/i},{system:'Electrical / Network / ECU',priority:2,keywords:/ecu|sensor|kelistrikan|battery|aki|charging|dtc|check engine/i},{system:'EV / HV / BMS',priority:3,keywords:/ev|hybrid|phev|bms|high voltage|motor listrik/i}];hypotheses=tests.filter(t=>t.keywords.test(text)).sort((a,b)=>b.priority-a.priority).map(t=>({system:t.system,priority:t.priority>=3?'high':'investigate',status:'hypothesis_only',reason:'Keyword match is a routing signal only; it does not establish root cause.',tests:['Define the diagnostic question and required operating conditions','Collect the applicable measurement, scan data, physical inspection or functional test','Compare actual result with vehicle-specific expected information','Record the result and reassess competing hypotheses']}));}const arch=[vehicle.engine_type,vehicle.transmission_type,vehicle.drive_layout,vehicle.vehicle_type,vehicle.vehicle_class].filter(Boolean).join(' ').toLowerCase();return {method:'VEHICLE IDENTITY → ARCHITECTURE → SYMPTOM → CONDITION → DIFFERENTIAL HYPOTHESES → EVIDENCE → TEST → RESULT → ROOT CAUSE → REPAIR/MODIFICATION → VALIDATION',safety:hypotheses.some(x=>/Brake|Cooling|EV|HV/i.test(x.system))?'CAUTION':'NORMAL',vehicleArchitecture:arch||JSON.stringify(ua),evidenceStatus:'insufficient_until_tested',hypotheses,missingData:['vehicle make/brand','vehicle model','vehicle type/class','year/model/variant','propulsion/engine type','transmission/drive architecture','odometer','maintenance/modification history','cold/hot condition','RPM/speed/load/throttle or accelerator data','DTC/live data where applicable']};};
+NS.buildUniversalDiagnosticPlan=(vehicle={},symptom='',conditions='',evidence={})=>{
+  const arch=universalArchitecture(vehicle);
+  const d=NS.diagnose(symptom,conditions,vehicle);
+  const applicable=(d.hypotheses||[]).filter(h=>{
+    if(arch.propulsion==='bev' && /Ignition|Combustion|Fuel \/ Delivery/.test(h.system)) return false;
+    if(arch.propulsion==='fuel_cell' && /Ignition|Combustion/.test(h.system)) return false;
+    if(['heavy_equipment','commercial'].includes(arch.class) && h.system==='Brake / Chassis') return true;
+    return true;
+  });
+  const gates=[];
+  if(arch.class==='unknown')gates.push('Vehicle class belum terverifikasi');
+  if(arch.propulsion==='unknown')gates.push('Propulsion belum terverifikasi');
+  if(arch.transmission==='unknown')gates.push('Transmission belum terverifikasi');
+  if(arch.drive==='unknown')gates.push('Drivetrain belum terverifikasi');
+  return {
+    universal:true,architecture:arch,evidenceStatus:d.evidenceStatus,
+    safetyGate:d.safety,
+    gates,
+    hypotheses:applicable.map((h,i)=>({...h,sequence:i+1})),
+    evidenceRequired:[
+      'Identitas exact make/model/year/variant/market',
+      'Propulsion + transmission + drivetrain architecture',
+      'Current symptom conditions and reproducible baseline',
+      'Relevant DTC/live data or physical measurements',
+      'OEM specification/procedure when a numeric limit or safety-critical claim is required'
+    ],
+    rule:'No root cause, repair or modification may be promoted from hypothesis to confirmed without test evidence.'
+  };
+};
 NS.buildDiagnosticTestCards=(diagnosis)=>{const out=[];(diagnosis?.hypotheses||[]).forEach(h=>(h.tests||[]).forEach(t=>out.push({hypothesis:h.system,test_name:t,expected_result:null,actual_result:null,status:'planned'})));return out;};
 NS.buildExpertPrompt=(caseData={},vehicle={},context={})=>{
  const d=NS.diagnose(caseData.symptom||caseData.title||'',caseData.conditions||'',vehicle);
