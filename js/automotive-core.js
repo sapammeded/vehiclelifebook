@@ -34,26 +34,81 @@ NS.assessSpec=(value,min,max)=>{
 };
 
 const tests=[
- {system:'Fuel',keywords:/susah hidup|hard start|sulit start|no start|tidak hidup|mogok|bensin|fuel|injector/i,tests:['Verifikasi tegangan battery saat crank','Ukur fuel pressure sesuai manual kendaraan','Periksa injector command/pulse bila alat tersedia','Bandingkan compression antar silinder','Periksa CKP/CMP dan sinkronisasi timing']},
- {system:'Ignition',keywords:/misfire|brebet|mbrebet|pincang|busi|coil|pengapian/i,tests:['Baca DTC dan freeze-frame','Periksa kondisi/gap busi sesuai spesifikasi','Tukar coil hanya sebagai uji terkontrol dan catat perubahan','Periksa fuel trim/lambda','Uji compression/leak-down bila indikasi mekanis']},
- {system:'Air/Throttle',keywords:/idle|langsam|throttle|gas|ngempos|hesit|tersendat/i,tests:['Periksa intake leak dan hose','Periksa throttle/TPS/MAP/MAF sesuai sistem','Bandingkan target vs actual idle/load','Periksa fuel trim','Validasi setelah perbaikan']},
- {system:'Cooling',keywords:/overheat|panas|temperatur|coolant|air radiator|radiator/i,tests:['Jangan lanjutkan operasi bila temperatur abnormal berat','Periksa level dan kebocoran coolant saat aman','Uji thermostat/fan/control sesuai manual','Periksa pressure cooling system','Periksa head-gasket/combustion gas bila ada indikasi']},
- {system:'Lubrication',keywords:/oli|oil pressure|tekanan oli|knocking|ngelitik|bunyi mesin/i,tests:['Periksa level/jenis oli','Ukur oil pressure dengan alat yang sesuai','Identifikasi noise berdasarkan RPM dan temperatur','Periksa filter/pickup bila diperlukan','Jangan melakukan high-RPM test bila tekanan oli meragukan']},
- {system:'CVT/Drivetrain',keywords:/cvt|roller|variator|belt|kopling|clutch|selip|slip|transmisi/i,tests:['Catat RPM, speed dan throttle saat gejala','Periksa belt/komponen sesuai interval dan wear limit','Periksa clutch engagement/slip','Verifikasi rasio/final drive','Uji temperatur dan validasi setelah perubahan']},
- {system:'Brake',keywords:/rem|brake|abs|getar saat rem|rem blong/i,tests:['Hentikan penggunaan bila pengereman tidak aman','Periksa level/fluid dan kebocoran','Periksa pad/disc/drum dan runout','Scan ABS bila tersedia','Bleeding/repair sesuai prosedur OEM']},
- {system:'EV/HV',keywords:/ev|hybrid|baterai|battery|soc|soh|inverter|motor listrik|high voltage|hv/i,tests:['Jangan membuka sistem HV tanpa prosedur OEM dan personel berkualifikasi','Baca DTC/BMS data bila alat yang tepat tersedia','Catat SOC/SOH, pack voltage dan temperatur','Periksa isolation/interlock hanya dengan prosedur aman','Validasi thermal/derating behavior setelah perbaikan']}
+ {system:'Fuel / Delivery',priority:3,keywords:/susah hidup|hard start|sulit start|no start|tidak hidup|mogok|bensin|fuel|injector|fuel pressure/i,tests:['Verifikasi battery/cranking voltage','Ukur fuel pressure sesuai dokumentasi kendaraan','Periksa injector command/pulse bila alat tersedia','Periksa air/fuel correction atau lambda data bila tersedia','Evaluasi compression bila indikasi mekanis']},
+ {system:'Ignition / Combustion',priority:3,keywords:/misfire|brebet|mbrebet|pincang|busi|coil|pengapian|knocking|detonation/i,tests:['Baca DTC dan freeze-frame','Periksa ignition components sesuai arsitektur kendaraan','Bandingkan misfire counter/cylinder contribution bila tersedia','Periksa fuel/air correction','Uji compression/leak-down bila indikasi mekanis']},
+ {system:'Air / Throttle / Control',priority:2,keywords:/idle|langsam|throttle|gas|ngempos|hesit|tersendat|responsif|responsiveness|akselerasi|akselerasi awal|tarikan awal|tarikan/i,tests:['Periksa intake/exhaust restriction dan kebocoran','Bandingkan throttle/accelerator request dengan actual','Periksa MAP/MAF/TPS atau sensor ekuivalen sesuai arsitektur','Periksa fuel/air correction atau torque request','Validasi pada kondisi operasi yang sama']},
+ {system:'Cooling / Thermal',priority:3,keywords:/overheat|panas|temperatur|coolant|air radiator|radiator|thermal|derating/i,tests:['Hentikan pengujian bila temperatur berada pada kondisi berbahaya','Periksa level dan kebocoran saat aman','Bandingkan commanded vs actual cooling control','Periksa temperatur sensor dan thermal limits','Validasi thermal behavior setelah tindakan']},
+ {system:'Lubrication / Mechanical',priority:3,keywords:/oli|oil pressure|tekanan oli|bunyi mesin|knocking|ngelitik|compression|kompresi/i,tests:['Periksa level dan kondisi lubricant','Ukur pressure/parameter yang relevan dengan alat yang sesuai','Karakterisasi noise berdasarkan RPM, load dan temperature','Periksa mechanical timing/compression bila ada indikasi','Jangan melakukan load test berisiko bila lubrication diragukan']},
+ {system:'Transmission / Drivetrain',priority:2,keywords:/cvt|roller|variator|belt|kopling|clutch|selip|slip|transmisi|gearbox|dct|amt|torque converter|final drive|drivetrain|akselerasi|tarikan/i,tests:['Catat speed, RPM, accelerator/throttle, gear/ratio dan load saat gejala','Tentukan tipe transmission/drivetrain sebelum menyimpulkan komponen','Periksa engagement/slip/ratio behavior sesuai arsitektur','Periksa wear/temperature/fluid/actuator data bila relevan','Uji ulang dalam kondisi yang sama dan bandingkan baseline']},
+ {system:'Brake / Chassis',priority:1,keywords:/rem|brake|abs|steering|setir|suspensi|suspension|ban|tyre|tire|getar/i,tests:['Hentikan penggunaan bila fungsi keselamatan terganggu','Periksa kebocoran, wear dan kondisi komponen','Scan ABS/ESC/steering modules bila tersedia','Periksa wheel/tire condition dan alignment bila relevan','Validasi melalui controlled road test yang aman']},
+ {system:'Electrical / Network / ECU',priority:2,keywords:/listrik|electrical|battery|aki|alternator|charging|starter|ecu|tcu|bcm|can|dtc|sensor|actuator|wiring/i,tests:['Periksa supply voltage, ground dan fuse/relay','Baca DTC seluruh module yang relevan','Periksa live data dan command vs actual','Periksa wiring/connectors sebelum mengganti module','Clear/retest hanya setelah baseline tersimpan']},
+ {system:'EV / HV / BMS',priority:3,keywords:/ev|hybrid|soc|soh|inverter|motor listrik|high voltage|hv|bms|traction battery|isolation/i,tests:['Jangan membuka HV system tanpa prosedur keselamatan dan kualifikasi yang sesuai','Baca DTC/BMS/VCU data dengan alat yang tepat','Catat SOC/SOH, pack voltage dan temperature bila tersedia','Periksa isolation/interlock hanya dengan prosedur aman','Validasi derating/thermal behavior setelah tindakan']}
 ];
-NS.diagnose=(symptom,conditions='')=>{
+const launchRules=[
+ {re:/tarikan awal|akselerasi awal|responsif|responsiveness|ngempos awal|start awal/i,systems:['Transmission / Drivetrain','Air / Throttle / Control','Ignition / Combustion'],tests:['Reproduksi keluhan dan catat cold/hot, RPM, speed, accelerator/throttle, gear/ratio dan load','Identifikasi architecture: CVT, AT, DCT, AMT, MT, EV reduction drive atau lainnya','Bandingkan requested vs actual torque/throttle/ratio bila data tersedia','Periksa mechanical/transmission engagement dan slip sesuai architecture','Periksa engine/drive-unit response dan air/combustion/electrical data sesuai propulsion','Ulangi controlled test setelah tindakan dan bandingkan baseline'] }
+];
+NS.diagnose=(symptom,conditions='',vehicle={})=>{
  const text=String(symptom||'')+' '+String(conditions||'');
- const matched=tests.filter(x=>x.keywords.test(text));
- const chosen=matched.length?matched:[{system:'General',tests:['Klarifikasi kondisi saat gejala terjadi','Catat cold/hot, RPM, speed, load dan lingkungan','Baca DTC/data live bila alat tersedia','Pisahkan electrical, fuel/air, mechanical, thermal dan control hypotheses','Lakukan test paling aman dengan nilai informasi tinggi terlebih dahulu']}];
- return {
-  method:'SYMPTOM → CONDITION → SYSTEM → HYPOTHESIS → TEST → RESULT → ROOT CAUSE → REPAIR → VALIDATION',
-  safety:chosen.some(x=>x.system==='EV/HV'||x.system==='Brake'||x.system==='Cooling')?'CAUTION':'NORMAL',
-  hypotheses:chosen.map(x=>({system:x.system,priority:'investigate',tests:x.tests}))
- };
+ const arch=[vehicle.engine_type,vehicle.transmission_type,vehicle.drive_layout,vehicle.vehicle_type,vehicle.vehicle_class].filter(Boolean).join(' ').toLowerCase();
+ let hypotheses=[];
+ const launch=launchRules.find(x=>x.re.test(text));
+ if(launch) hypotheses=launch.systems.map((system,i)=>({system,priority:i===0?'high':'investigate',status:'hypothesis_only',reason:'Symptom pattern requires testing; architecture and measurements are not sufficient to confirm root cause.',tests:launch.tests}));
+ else {
+  const matched=tests.filter(x=>x.keywords.test(text)).sort((a,b)=>a.priority-b.priority);
+  const chosen=matched.length?matched:[{system:'General Diagnostic',priority:4,tests:['Klarifikasi operating condition','Catat cold/hot, RPM, speed, load, environment dan recent changes','Baca DTC/data live bila alat tersedia','Pisahkan mechanical, fuel/air, electrical, thermal dan control hypotheses','Pilih test paling aman dengan information value tertinggi terlebih dahulu']}];
+  hypotheses=chosen.map(x=>({system:x.system,priority:'investigate',status:'hypothesis_only',reason:'Pattern match only; not a confirmed fault.',tests:x.tests}));
+ }
+ return {method:'VEHICLE IDENTITY → ARCHITECTURE → SYMPTOM → CONDITION → DIFFERENTIAL HYPOTHESES → EVIDENCE → TEST → RESULT → ROOT CAUSE → REPAIR/MODIFICATION → VALIDATION',safety:hypotheses.some(x=>/Brake|Cooling|EV|HV/i.test(x.system))?'CAUTION':'NORMAL',vehicleArchitecture:arch||'unknown',evidenceStatus:'insufficient_until_tested',hypotheses,missingData:['vehicle type/class','year/model/variant','propulsion/engine type','transmission/drive architecture','odometer','maintenance/modification history','cold/hot condition','RPM/speed/load/throttle or accelerator data','DTC/live data where applicable']};
 };
+NS.buildExpertPrompt=(caseData={},vehicle={},context={})=>{
+ const d=NS.diagnose(caseData.symptom||caseData.title||'',caseData.conditions||'',vehicle);
+ const clean={vehicle,case:caseData,context,diagnosticFramework:d};
+ return `VEHICLE LIFEBOOK — UNIVERSAL AUTOMOTIVE MASTER INTELLIGENCE
 
+ROLE
+Act as a multidisciplinary automotive master technician, diagnostic engineer and vehicle systems specialist. Cover motorcycles, scooters, passenger cars, commercial vehicles, trucks, buses, trailers/semitrailers, ICE, diesel, hybrid, PHEV, BEV, MT, AT, CVT, DCT, AMT and other architectures.
+
+MISSION
+Produce a technically defensible diagnostic plan from the supplied evidence. Do not pretend a hypothesis is a confirmed fault.
+
+MANDATORY REASONING
+VEHICLE IDENTITY → ARCHITECTURE → SYMPTOM → CONDITION → DIFFERENTIAL DIAGNOSIS → EVIDENCE REQUIRED → TEST → MEASUREMENT → RESULT → ROOT CAUSE → REPAIR/ADJUSTMENT/MODIFICATION → VALIDATION.
+
+EVIDENCE LABELS
+[FACT] [OEM VERIFIED] [SOURCED] [ENGINEERING INFERENCE] [ESTIMATE] [HYPOTHESIS] [UNKNOWN]
+
+ANTI-HALLUCINATION
+Never invent OEM specifications, torque values, fluid specs, service intervals, part numbers, DTC meanings, sensor thresholds, wiring, maintenance history, prices or vehicle data. If missing, mark UNKNOWN and state what evidence is required.
+
+DIAGNOSTIC RULES
+- Generate multiple plausible hypotheses when appropriate.
+- Explain why each hypothesis is plausible.
+- State evidence that would support or contradict it.
+- Prefer safe, non-invasive, high-information tests first.
+- Never recommend replacing a part merely because it is commonly associated with a symptom.
+- Do not recommend a performance modification as a cure before baseline diagnosis.
+- Respect vehicle-specific safety procedures, especially HV, brakes, fuel pressure, lifting, rotating components and thermal hazards.
+- When OEM/model-specific data is required, request or verify the exact vehicle/market/variant before treating it as specification.
+
+OUTPUT
+1. Case understanding
+2. Vehicle architecture
+3. Missing information
+4. Differential hypotheses
+5. Evidence required
+6. Diagnostic test sequence
+7. Expected result + interpretation for each test
+8. Root-cause decision tree
+9. Repair/maintenance options only after evidence
+10. Modification options separately, with compatibility/risk/validation
+11. Validation procedure
+12. Uncertainty and assumptions
+
+VEHICLE LIFEBOOK DATA
+${JSON.stringify(clean,null,2)}
+
+Do not give a generic parts-shopping answer. Think like a diagnostic professional and show the reasoning path without claiming certainty beyond the evidence.`;
+};
 NS.buildContext=(vehicle,config,components,mods)=>{
  return {vehicle:vehicle||{},configuration:config||{},components:components||[],modifications:mods||[],generatedAt:new Date().toISOString(),engineVersion:NS.version};
 };
