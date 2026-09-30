@@ -619,6 +619,25 @@ NS.oem={
   }
 };
 
+NS.indicatorCatalog={
+  version:'global-indicators-v1',
+  groups:{
+    electrical:[{id:'battery',aliases:['battery','aki','baterai 12v','charging'],meaning:'Sistem kelistrikan/baterai atau pengisian perlu diperiksa; simbol berkedip/menyala tidak otomatis berarti aki habis.',checks:['tegangan baterai sesuai prosedur OEM','charging/alternator/DC-DC','terminal dan koneksi','DTC bila tersedia']}],
+    lubrication:[{id:'oil_pressure',aliases:['oil','oli','engine oil','tekanan oli'],meaning:'Peringatan tekanan/level oli atau sistem pelumasan; ini dapat menjadi kondisi kritis tergantung simbol dan kendaraan.',checks:['hentikan operasi bila manual OEM mensyaratkan','cek level dan kebocoran','ukur tekanan bila prosedur tersedia','baca DTC']}],
+    thermal:[{id:'temperature',aliases:['temperature','temp','coolant','overheat','suhu','temperatur'],meaning:'Suhu mesin/sistem pendinginan berada di luar kondisi normal atau sensor mendeteksi fault.',checks:['coolant level','fan/pump/thermostat sesuai arsitektur','sensor/live data','kebocoran']}],
+    brake:[{id:'brake',aliases:['brake','rem','abs'],meaning:'Sistem rem/ABS/EPB memerlukan perhatian; jangan menganggap penyebab hanya kampas rem tanpa pemeriksaan.',checks:['level fluida','kebocoran','pad/disc bila relevan','ABS/ESC/EPB DTC']}],
+    engine:[{id:'check_engine',aliases:['check engine','mil','engine warning','check'],meaning:'ECU mendeteksi kondisi yang memerlukan diagnosis; simbol saja tidak menentukan komponen rusak.',checks:['scan DTC','freeze frame/live data','reproduce symptom','OEM diagnostic procedure']}],
+    transmission:[{id:'transmission',aliases:['transmission','gear','transmisi','cvt'],meaning:'Kontrol/transmisi mendeteksi kondisi yang perlu diperiksa sesuai tipe transmisi.',checks:['fluid/level bila applicable','DTC','temperature','slip/ratio/engagement data']}],
+    tire:[{id:'tire_pressure',aliases:['tire pressure','tpms','ban','tekanan ban'],meaning:'Tekanan ban atau sistem TPMS perlu diperiksa.',checks:['ukur tekanan aktual','kebocoran','sensor/TPMS relearn sesuai OEM']}],
+    ev_hybrid:[{id:'hybrid_hv',aliases:['hybrid','hv','high voltage','bms','ev','electric'],meaning:'Sistem HV/EV mendeteksi status atau fault; jangan membuka komponen HV tanpa prosedur keselamatan OEM.',checks:['warning message/DTC','SOC/temperature/live data','isolation/interlock sesuai prosedur','HV safety procedure']}],
+    safety:[{id:'airbag',aliases:['airbag','srs'],meaning:'SRS/airbag warning memerlukan diagnosis sistem keselamatan; jangan menyimpulkan airbag rusak hanya dari indikator.',checks:['SRS DTC','wiring/connectors','OEM restraint procedure']}],
+    service:[{id:'service',aliases:['service','maintenance','wrench','spanner'],meaning:'Pengingat servis/maintenance aktif; interval dan tindakan harus mengikuti jadwal OEM kendaraan tersebut.',checks:['odometer/time','maintenance history','OEM service schedule']}]
+  },
+  find(query){const q=String(query||'').toLowerCase();const out=[];Object.entries(this.groups).forEach(([group,items])=>items.forEach(x=>{if(x.aliases.some(a=>q.includes(a)))out.push({...x,group})}));return out},
+  analyze({vehicle={},indicator='',state='on',message='',conditions=''}={}){const matches=this.find(indicator+' '+message);return {version:this.version,vehicle:{make:vehicle.brand||vehicle.make||null,model:vehicle.model||null,year:vehicle.year||null,variant:vehicle.variant||null},input:{indicator,state,message,conditions},matches,evidenceRule:'indicator identifies a warning category, not a root cause',criticalRule:matches.some(x=>['oil_pressure','brake','temperature','hybrid_hv','airbag'].includes(x.id))?'follow safety/OEM procedure before continued operation':'diagnose before replacing parts',unknownIfNoMatch:!matches.length,nextAction:matches.length?'Identify exact symbol/message and run the listed checks against OEM procedure':'Capture exact icon/message/photo and vehicle identity before interpreting'}},
+  prompt(vehicle,indicator,details=''){return ['VEHICLE LIFEBOOK — UNIVERSAL WARNING INDICATOR EXPERT','Vehicle='+JSON.stringify(vehicle),'Indicator='+indicator,'Details='+details,'Interpret the exact dashboard/warning indicator for this exact vehicle. Do not assume the icon has identical meaning across all makes/models. Explain: symbol meaning, severity, whether operation should stop, possible causes, required checks, exact evidence needed, relevant DTC/live data, OEM procedure/source requirements, and what NOT to do. Never say oil/battery/brake/etc. is simply “habis” unless evidence proves it. Separate warning meaning from root cause.'].join('\\n')}
+};
+
 NS.telemetry={
   normalize({channel,value,unit,quality='valid',observedAt=new Date().toISOString(),rawValue=null}){
     return {channel,value:Number(value),unit:unit||null,quality,observedAt,rawValue};
