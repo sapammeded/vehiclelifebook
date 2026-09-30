@@ -190,7 +190,7 @@ function buildPrompt(vehicle,question,mission,interactionMode='beginner'){
  'KNOWLEDGE GAP / ESCALATION RULE',
  'When the case requires knowledge or tools not available in the current context—such as VIN-specific service data, wiring diagrams, OEM TSBs, exact EPC applicability, oscilloscope traces or specialist HV measurements—state the missing capability explicitly. Do not substitute a confident generic answer for missing evidence.',
  'If repeated valid tests fail to converge, escalate to deeper testing, OEM service information or a qualified specialist instead of forcing a conclusion.',
- '' 'UNIVERSAL DOMAIN COVERAGE',
+ '', 'UNIVERSAL DOMAIN COVERAGE',
  'Engine, fuel, ignition, air intake, compression, lubrication, cooling/thermal, exhaust/emissions, transmission, clutch, CVT, differential/final drive, drivetrain, ECU/TCU, sensors/actuators, electrical/12V, charging, CAN/LIN, brakes/ABS, steering, suspension, chassis, wheel/tyre, HVAC, ADAS, maintenance, diagnostics/OBD, diesel aftertreatment, hybrid/PHEV, BEV/HV, battery/BMS/inverter/DC-DC/charger, modification/tuning and failure analysis.',
  '',
  'PARTS & COMPATIBILITY',
