@@ -80,7 +80,7 @@ function loadScriptOnce(src,key){
  if(__lazyScripts[key])return __lazyScripts[key];
  __lazyScripts[key]=new Promise((resolve,reject)=>{
    const el=document.createElement('script');el.src=src;el.async=true;
-   el.onload=()=>window[key]?resolve(window[key]):reject(new Error('Library loaded without '+key));
+   el.onload=()=>key?(window[key]?resolve(window[key]):reject(new Error('Library loaded without '+key))):resolve(true);
    el.onerror=()=>reject(new Error('Gagal memuat library: '+key));document.head.appendChild(el);
  });
  return __lazyScripts[key];
@@ -88,7 +88,7 @@ function loadScriptOnce(src,key){
 async function ensureExportEngine(type){
  if(type==='xlsx')return loadScriptOnce('https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js','XLSX');
  if(type==='docx')return loadScriptOnce('https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.iife.js','docx');
- if(type==='pdf'){await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js','jspdf');return loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js','jspdfAutoTable').catch(()=>window.jspdf);}
+ if(type==='pdf'){await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js','jspdf');return loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',null);}
 }
 function vehicleContext(v){
   const ev=state.events||[];
