@@ -269,14 +269,18 @@ function openGlobalAutomotiveModal(){
    const q=m.querySelector('#globalMissionQ').value.trim(),pn=m.querySelector('#globalPartNo').value.trim(),component=m.querySelector('#globalComponent').value.trim();
    if(!q&&!pn&&!component){toast('Isi pertanyaan, nomor part, atau komponen');return}
    const out=m.querySelector('#globalOut');out.innerHTML='<div class="small muted">Mencari evidence OEM…</div>';
+   let retrievalId=null;
    try{
+     const rr=await state.sb.from('oem_retrieval_runs').insert({vehicle_id:v.id,requested_specs:[{query:q,part_number:pn,component}],source_policy:{official_first:true,never_guess:true,critical_requires_verified:true},status:'running',started_at:new Date().toISOString(),created_by:state.user.id}).select('id').single();
+     if(!rr.error)retrievalId=rr.data?.id;
      const data=await window.VehicleLifebookGlobal.queryParts({supabase:state.sb,vehicle:v,query:q,partNumber:pn,component});
      out.innerHTML=window.VehicleLifebookGlobal.renderPartResults(data,esc);
      if(data?.matches?.length)out.innerHTML+='<button class="btn ghost" style="width:100%;margin-top:10px" id="saveOemEvidence">📚 Simpan hasil OEM sebagai Evidence</button>';
      if(data?.rules?.never_guess)out.innerHTML+='<div class="small muted" style="margin-top:9px">Rule: exact OEM part number adalah evidence kuat; family/cc/platform saja bukan bukti kompatibilitas.</div>';
+     if(retrievalId)await state.sb.from('oem_retrieval_runs').update({status:data.matches?.length?'partial':'completed',sources:data.matches||[],extracted_claims:data.relations||[],completed_at:new Date().toISOString()}).eq('id',retrievalId);
      const saveOemEvidence=m.querySelector('#saveOemEvidence');
      if(saveOemEvidence)saveOemEvidence.onclick=async()=>{try{const title='OEM Parts Intelligence — '+([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' '));const src=await state.sb.from('evidence_sources').insert({owner_id:state.user.id,source_type:'parts_catalog',title,publisher:'Vehicle Lifebook OEM Parts Engine',trust_level:'high',metadata:{query:q,part_number:pn,component,matches:data.matches,relations:data.relations}}).select('id').single();if(src.error)throw src.error;const claim=data.matches.map(x=>x.part_number+' — '+(x.part_name||'')+' — '+[x.make,x.model,x.variant,x.year_from&&x.year_to?(x.year_from+'–'+x.year_to):''].filter(Boolean).join(' · ')).join('\\n');const ev=await state.sb.from('vehicle_evidence').insert({vehicle_id:v.id,source_id:src.data.id,claim,observation:'Saved from OEM Parts Intelligence query.',confidence:1,verification_status:'corroborated',created_by:state.user.id});if(ev.error)throw ev.error;toast('OEM result tersimpan sebagai Evidence')}catch(e){toast(e.message||'Gagal menyimpan evidence')}};
-   }catch(e){out.innerHTML='<div class="empty">OEM Parts Engine: '+esc(e.message||e)+'</div>'}
+   }catch(e){if(retrievalId)await state.sb.from('oem_retrieval_runs').update({status:'failed',errors:[{message:String(e.message||e)}],completed_at:new Date().toISOString()}).eq('id',retrievalId);out.innerHTML='<div class="empty">OEM Parts Engine: '+esc(e.message||e)+'</div>'}
  };
 }
 function openExpertModal(){
