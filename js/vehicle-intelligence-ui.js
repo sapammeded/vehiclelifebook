@@ -6,15 +6,17 @@
   const json=x=>{try{return JSON.parse(x||'{}')}catch{return null}};
   const q=id=>document.getElementById(id);
 
-  async function rows(table,vehicleId){
-    const {data,error}=await state.sb.from(table).select('*').eq('vehicle_id',vehicleId).order('created_at',{ascending:false});
+  async function rows(table,vehicleId,orderColumn){
+    let query=state.sb.from(table).select('*').eq('vehicle_id',vehicleId);
+    if(orderColumn)query=query.order(orderColumn,{ascending:false});
+    const {data,error}=await query;
     if(error)throw error; return data||[];
   }
   async function load(v){
     const [config,components,mods,cases,calcs,evidence,validations]=await Promise.all([
       state.sb.from('vehicle_configurations').select('*').eq('vehicle_id',v.id).maybeSingle(),
       rows('vehicle_components',v.id),rows('vehicle_modifications',v.id),
-      rows('diagnostic_cases',v.id),rows('vehicle_calculations',v.id),
+      rows('diagnostic_cases',v.id,'opened_at'),rows('vehicle_calculations',v.id),
       rows('vehicle_evidence',v.id),rows('validation_records',v.id)
     ]);
     for(const r of [config,...components,...mods,...cases,...calcs,...evidence,...validations])if(r?.error)throw r.error;
