@@ -105,11 +105,18 @@
  const renderAnalysis=(host,d)=>{host.innerHTML='<div class="card" style="box-shadow:none;background:#fff;margin-top:8px"><div class="row between"><strong>🧠 Differential Diagnosis</strong><span class="badge warning">'+esc0(d.evidenceStatus)+'</span></div><div class="small muted" style="margin-top:5px">'+esc0(d.method)+'</div><div class="small" style="margin-top:8px"><strong>Architecture:</strong> '+esc0(d.vehicleArchitecture)+' · <strong>Safety:</strong> '+esc0(d.safety)+'</div><div style="margin-top:8px">'+d.hypotheses.map((h,i)=>'<div class="card" style="box-shadow:none;background:#f8fafc;margin:6px 0"><div><strong>'+(i+1)+'. '+esc0(h.system)+'</strong> <span class="badge">'+esc0(h.priority)+'</span> <span class="badge warning">HYPOTHESIS ONLY</span></div><div class="small muted" style="margin-top:5px">'+esc0(h.reason)+'</div><ol class="small" style="margin:6px 0 0 18px">'+h.tests.map(t=>'<li>'+esc0(t)+'</li>').join('')+'</ol></div>').join('')+'</div><div class="small muted" style="margin-top:8px"><strong>Data missing:</strong> '+d.missingData.map(esc0).join(' · ')+'</div></div>'};
  q('viAnalyzeNew').onclick=()=>{try{const symptom=q('vdSymptom').value.trim();if(!symptom)throw Error('Isi gejala dulu');const d=window.VehicleLifebookCore?.diagnose(symptom,'',data.config||{});if(!d)throw Error('Automotive Core belum termuat');renderAnalysis(q('viNewAnalysis'),d)}catch(e){toast(e.message)}};
  async function savePlannedTests(caseId,d){
-  const rows=[]; (d.hypotheses||[]).forEach(h=>(h.tests||[]).forEach((t,i)=>rows.push({case_id:caseId,sequence_no:i+1,hypothesis:h.system,test_name:t,expected_result:null,actual_result:null,status:'planned'})));
-  for(const row of rows){const r=await state.sb.from('diagnostic_steps').insert(row);if(r.error)throw r.error;}
-  toast(rows.length+' planned test dibuat'); await open(v.id,m,'diagnostics');
+  const existing=await state.sb.from('diagnostic_steps').select('hypothesis,test_name').eq('case_id',caseId);
+  if(existing.error)throw existing.error;
+  const seen=new Set((existing.data||[]).map(x=>String(x.hypothesis||'')+'|'+String(x.test_name||'')));
+  const rows=[];let n=0;
+  (d.hypotheses||[]).forEach(h=>(h.tests||[]).forEach(t=>{
+    const k=String(h.system||'')+'|'+String(t||'');
+    if(!seen.has(k)){n++;rows.push({case_id:caseId,sequence_no:n,hypothesis:h.system,test_name:t,expected_result:null,actual_result:null,status:'planned'});seen.add(k);}
+  }));
+  if(!rows.length){toast('Semua test plan sudah ada');return;}
+  const ins=await state.sb.from('diagnostic_steps').insert(rows);if(ins.error)throw ins.error;
+  toast(rows.length+' planned test dibuat');await open(v.id,m,'diagnostics');
  }
- document.querySelectorAll('[data-plan-tests]').forEach(btn=>btn.onclick=async()=>{try{const c=data.cases.find(x=>String(x.id)===String(btn.dataset.planTests));if(!c)throw Error('Kasus tidak ditemukan');const d=window.VehicleLifebookCore?.diagnose(c.symptom||c.title,'',Object.assign({},v,data.config||{}));if(!d)throw Error('Automotive Core belum termuat');await savePlannedTests(c.id,d)}catch(e){toast('Gagal membuat test plan: '+e.message)}});
  document.querySelectorAll('[data-analyze]').forEach(btn=>btn.onclick=()=>{try{const c=data.cases.find(x=>String(x.id)===String(btn.dataset.analyze));if(!c)throw Error('Kasus tidak ditemukan');const d=window.VehicleLifebookCore?.diagnose(c.symptom||c.title,'',data.config||{});if(!d)throw Error('Automotive Core belum termuat');renderAnalysis(q('analysis_'+c.id),d)}catch(e){toast(e.message)}});
  document.querySelectorAll('[data-prompt]').forEach(btn=>btn.onclick=async()=>{try{const c=data.cases.find(x=>String(x.id)===String(btn.dataset.prompt));if(!c)throw Error('Kasus tidak ditemukan');const mission=window.VehicleLifebookGlobal?.buildMission(Object.assign({},v,data.config||{}),c.symptom||c.title||'');const prompt=window.VehicleLifebookGlobal?.buildPrompt(Object.assign({},v,data.config||{}),c.symptom||c.title||'',mission,'technical');if(!prompt)throw Error('Global Automotive Expert Engine belum termuat');await navigator.clipboard.writeText(prompt);toast('Prompt Expert AI disalin — siap dikirim ke AI lain')}catch(e){toast('Gagal copy prompt: '+e.message)}});
 }
