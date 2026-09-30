@@ -330,16 +330,20 @@ async function exportDocx(images=[]){
 
 async function boot(){
   // Render the welcome gate immediately. Recovery links must render a password-change screen.
-  const isRecovery=/#.*(?:^|&)type=recovery(?:&|$)/i.test(location.hash)||/[?&]type=recovery(?:&|$)/i.test(location.search);
+  const hashParams=new URLSearchParams(String(location.hash||'').replace(/^#/,''));
+  const searchParams=new URLSearchParams(location.search||'');
+  const isRecovery=hashParams.get('type')==='recovery'||searchParams.get('type')==='recovery';
   if(isRecovery) renderPasswordRecovery(); else renderAuth();
   try{
     state.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     const {data:{session}}=await state.sb.auth.getSession();
     state.user=session?.user||null;
-    if(state.user && !isRecovery) await afterLogin();
+    // Do not let a valid recovery session fall through to the normal app/login screen.
+    if(isRecovery) renderPasswordRecovery();
+    else if(state.user) await afterLogin();
     state.sb.auth.onAuthStateChange(async(_e,session)=>{
       state.user=session?.user||null;
-      if(_e==='PASSWORD_RECOVERY'){ renderPasswordRecovery(); return; }
+      if(_e==='PASSWORD_RECOVERY'||isRecovery){ renderPasswordRecovery(); return; }
       if(state.user) await afterLogin();
       else if(_e!=='INITIAL_SESSION') renderAuth();
     });
