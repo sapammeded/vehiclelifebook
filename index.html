@@ -10,10 +10,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.iife.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="js/automotive-core.js"></script>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--shadow:0 10px 30px rgba(15,23,42,.07);--r:18px}
@@ -56,6 +52,7 @@ input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;bo
 <div id="toast" class="toast"></div>
 
 <script src="js/global-automotive-intelligence.js"></script>
+<script src="js/vehicle-intelligence-ui.js"></script>
 <script>
 'use strict';
 
@@ -77,6 +74,22 @@ function loadConfig(){try{return JSON.parse(localStorage.getItem(APP_KEY)||'null
 function validUrl(s){try{const u=new URL(s);return u.protocol==='https:'&&u.hostname.endsWith('supabase.co')}catch{return false}}
 function setBusy(v){state.busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v)}
 function currentVehicle(){return state.vehicles.find(x=>x.id===state.selected)||null}
+const __lazyScripts={};
+function loadScriptOnce(src,key){
+ if(window[key])return Promise.resolve(window[key]);
+ if(__lazyScripts[key])return __lazyScripts[key];
+ __lazyScripts[key]=new Promise((resolve,reject)=>{
+   const el=document.createElement('script');el.src=src;el.async=true;
+   el.onload=()=>window[key]?resolve(window[key]):reject(new Error('Library loaded without '+key));
+   el.onerror=()=>reject(new Error('Gagal memuat library: '+key));document.head.appendChild(el);
+ });
+ return __lazyScripts[key];
+}
+async function ensureExportEngine(type){
+ if(type==='xlsx')return loadScriptOnce('https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js','XLSX');
+ if(type==='docx')return loadScriptOnce('https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.iife.js','docx');
+ if(type==='pdf'){await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js','jspdf');return loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js','jspdfAutoTable').catch(()=>window.jspdf);}
+}
 function vehicleContext(v){
   const ev=state.events||[];
   const lines=ev.map((e,i)=>`${i+1}. ${e.event_date} | ${String(e.event_type||'').toUpperCase()} | ${e.title||''} | biaya ${rupiah(e.total_cost||0)} | odo ${e.odometer??'—'} km | ${e.description||''}`);
@@ -293,6 +306,7 @@ function openExpertModal(){
  };
 }
 async function exportXlsx(){
+ await ensureExportEngine('xlsx');
  if(!state.events.length){toast('Belum ada data untuk diekspor');return}
  const v=currentVehicle(), rows=state.events.map(e=>({Tanggal:e.event_date,Jenis:e.event_type,Judul:e.title,Biaya:Number(e.total_cost||0),Odometer:e.odometer??'',Deskripsi:e.description||'',Sumber:e.source||''}));
  const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
@@ -318,6 +332,7 @@ async function prepareExportImages(files){const list=Array.from(files||[]).filte
 function imageBoxSize(img,maxW,maxH){const r=Math.min(maxW/img.width,maxH/img.height,1);return {w:Math.max(1,Math.round(img.width*r)),h:Math.max(1,Math.round(img.height*r))}}
 function dataUrlToArrayBuffer(dataUrl){const b64=String(dataUrl).split(",")[1]||"";const bin=atob(b64),out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out.buffer}
 async function exportPdf(images=[]){
+ await ensureExportEngine('pdf');
  if(!state.events.length){toast("Belum ada data untuk diekspor");return}
  const v=currentVehicle();const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4",compress:true});
  doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text("VEHICLE LIFEBOOK",14,15);
@@ -329,6 +344,7 @@ async function exportPdf(images=[]){
  doc.save("vehicle-lifebook-"+(v?.plate_number||"vehicle").replace(/\s+/g,"-")+".pdf");toast(images.length?"PDF selesai • "+images.length+" foto masuk":"PDF selesai")
 }
 async function exportDocx(images=[]){
+ await ensureExportEngine('docx');
  if(!state.events.length){toast("Belum ada data untuk diekspor");return}
  if(!window.docx){toast("Word engine belum termuat. Coba refresh halaman.");return}
  const {Document,Packer,Paragraph,TextRun,HeadingLevel,ImageRun}=window.docx,v=currentVehicle();
@@ -574,13 +590,13 @@ function renderApp(){
  const expertBtn=$('#expertBtn'); if(expertBtn) expertBtn.onclick=()=>openExpertModal();
  const exportBtn=$('#exportBtn'); if(exportBtn) exportBtn.onclick=()=>openExportModal();
  const addEvent=$('#addEvent'); if(addEvent) addEvent.onclick=()=>openEventModal();
- const globalAutoBtn=$('#globalAutoBtn'); if(globalAutoBtn) globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
+ const intelBtn=$('#vehicleIntelBtn'); if(intelBtn) intelBtn.onclick=()=>window.VehicleLifebookIntelligence.open(state.selected); const globalAutoBtn=$('#globalAutoBtn'); if(globalAutoBtn) globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});document.querySelectorAll('[data-event-media]').forEach(b=>b.onclick=()=>openEventMediaModal(b.dataset.eventMedia));document.querySelectorAll('[data-edit-event]').forEach(b=>b.onclick=()=>openEditEventModal(b.dataset.editEvent));document.querySelectorAll('[data-delete-event]').forEach(b=>b.onclick=()=>deleteEvent(b.dataset.deleteEvent));
 }
 
 function vehicleSection(v){
  const total=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
- return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><div class="row"><button class="btn ghost" id="globalAutoBtn">🧠 Global Automotive</button><button class="btn primary" id="addEvent">+ Aktivitas</button></div></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
+ return `<section style="margin-top:12px"><div class="card"><div class="row between"><div><div class="small muted">KENDARAAN TERPILIH</div><h2 style="margin:2px 0">${esc(v.plate_number)}</h2><div class="muted">${esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))}</div></div><div class="row"><button class="btn ghost" id="vehicleIntelBtn">🧬 Intelligence</button><button class="btn ghost" id="globalAutoBtn">🧠 Global Automotive</button><button class="btn primary" id="addEvent">+ Aktivitas</button></div></div><div class="two" style="margin-top:14px"><div><div class="small muted">Odometer</div><strong>${v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km'}</strong></div><div><div class="small muted">Total aktivitas</div><strong>${state.events.length}</strong></div></div></div>
  <div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Timeline</h3><input id="eventSearch" style="max-width:220px" placeholder="Cari aktivitas..."></div><div id="timeline" style="margin-top:12px">${timelineHtml(state.events)}</div></div></section>`;
 }
 function mediaCount(eventId){return (state.mediaByEvent?.[eventId]||[]).length}
