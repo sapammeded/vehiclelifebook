@@ -28,6 +28,10 @@ jobs:
           node-version: 22
       - name: Validate frontend JavaScript syntax
         run: node scripts/validate-index.mjs
+      - name: Validate intelligence workspace and lazy exports
+        run: node scripts/validate-intelligence.mjs
+      - name: Validate onboarding lifecycle
+        run: node scripts/validate-onboarding.mjs
 
   deploy:
     if: github.event_name != 'pull_request'
@@ -48,3 +52,14 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+  post-deploy-smoke:
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke test deployed GitHub Pages
+        run: node scripts/smoke-pages.mjs
