@@ -329,20 +329,56 @@ async function exportDocx(images=[]){
 }
 
 async function boot(){
-  // Render the welcome gate immediately. Do not wait for Supabase/session initialization.
-  // This prevents the first-load video from being created late and appearing as a black panel.
-  renderAuth();
+  // Render the welcome gate immediately. Recovery links must render a password-change screen.
+  const isRecovery=/#.*(?:^|&)type=recovery(?:&|$)/i.test(location.hash)||/[?&]type=recovery(?:&|$)/i.test(location.search);
+  if(isRecovery) renderPasswordRecovery(); else renderAuth();
   try{
     state.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     const {data:{session}}=await state.sb.auth.getSession();
     state.user=session?.user||null;
-    if(state.user) await afterLogin();
+    if(state.user && !isRecovery) await afterLogin();
     state.sb.auth.onAuthStateChange(async(_e,session)=>{
       state.user=session?.user||null;
+      if(_e==='PASSWORD_RECOVERY'){ renderPasswordRecovery(); return; }
       if(state.user) await afterLogin();
       else if(_e!=='INITIAL_SESSION') renderAuth();
     });
   }catch(e){toast('Gagal menginisialisasi aplikasi: '+e.message)}
+}
+
+function renderPasswordRecovery(){
+ $('#app').innerHTML=`<main class="landing"><div class="landing-shell">
+ <section class="landing-auth" style="max-width:520px;margin:auto">
+   <div class="landing-logo"><div class="landing-logo-mark">🔐</div><div><div style="font-weight:700;font-size:20px">Vehicle Lifebook</div><div class="small muted">Pemulihan Password</div></div></div>
+   <h2 style="margin:0 0 6px">Buat password baru</h2>
+   <p class="muted small" style="margin-top:0">Masukkan password baru untuk akun Anda.</p>
+   <div class="field" style="margin-top:20px"><label>Password baru</label><input id="newPassword" type="password" autocomplete="new-password" placeholder="Minimal 6 karakter"></div>
+   <div class="field"><label>Ulangi password</label><input id="newPassword2" type="password" autocomplete="new-password" placeholder="Ulangi password"></div>
+   <button class="btn primary" id="saveNewPassword" style="width:100%">Simpan Password Baru</button>
+   <button class="btn gray" id="backToLogin" style="width:100%;margin-top:10px">Kembali ke Login</button>
+ </section>
+ </div></main>`;
+ document.getElementById('saveNewPassword').onclick=async()=>{
+   const p=document.getElementById('newPassword').value;
+   const p2=document.getElementById('newPassword2').value;
+   if(p.length<6){toast('Password minimal 6 karakter');return}
+   if(p!==p2){toast('Konfirmasi password tidak sama');return}
+   setBusy(true);
+   try{
+     const {error}=await state.sb.auth.updateUser({password:p});
+     if(error)throw error;
+     toast('Password berhasil diubah. Silakan masuk.');
+     await state.sb.auth.signOut();
+     history.replaceState({},'',location.pathname+location.search);
+     renderAuth();
+   }catch(e){toast('Gagal mengubah password: '+(e?.message||e))}
+   finally{setBusy(false)}
+ };
+ document.getElementById('backToLogin').onclick=async()=>{
+   try{await state.sb.auth.signOut()}catch(_){}
+   history.replaceState({},'',location.pathname);
+   renderAuth();
+ };
 }
 
 function renderSetup(msg=''){
