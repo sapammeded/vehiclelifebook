@@ -1,0 +1,115 @@
+'use strict';
+(function(){
+  const tableMap={fuel:'fuel_logs',service:'service_logs',damage:'damage_logs',part:'part_logs',inspection:'inspection_logs',expense:'expense_logs'};
+  const esc0=x=>typeof esc==='function'?esc(x):String(x??'');
+  const num=x=>x===''||x==null?null:Number(x);
+  const json=x=>{try{return JSON.parse(x||'{}')}catch{return null}};
+  const q=id=>document.getElementById(id);
+
+  async function rows(table,vehicleId){
+    const {data,error}=await state.sb.from(table).select('*').eq('vehicle_id',vehicleId).order('created_at',{ascending:false});
+    if(error)throw error; return data||[];
+  }
+  async function load(v){
+    const [config,components,mods,cases,calcs,evidence,validations]=await Promise.all([
+      state.sb.from('vehicle_configurations').select('*').eq('vehicle_id',v.id).maybeSingle(),
+      rows('vehicle_components',v.id),rows('vehicle_modifications',v.id),
+      rows('diagnostic_cases',v.id),rows('vehicle_calculations',v.id),
+      rows('vehicle_evidence',v.id),rows('validation_records',v.id)
+    ]);
+    for(const r of [config,...components,...mods,...cases,...calcs,...evidence,...validations])if(r?.error)throw r.error;
+    return {config:config.data||{},components,mods,cases,calcs,evidence,validations};
+  }
+  const card=(title,body)=>'<div class="card" style="box-shadow:none;margin-top:8px"><strong>'+esc0(title)+'</strong>'+body+'</div>';
+  function tabs(active){return '<div class="tabs" id="viTabs" style="margin-top:10px">'+['overview','components','mods','diagnostics','calculations','evidence'].map(x=>'<button class="tab '+(active===x?'active':'')+'" data-vi-tab="'+x+'">'+({overview:'⚙️ Konfigurasi',components:'🧩 Komponen',mods:'🔧 Modifikasi',diagnostics:'🩺 Diagnosis',calculations:'🧮 Kalkulasi',evidence:'📚 Evidence'}[x])+'</button>').join('')+'</div>'}
+  function configForm(d){
+    const v=k=>esc0(d[k]??'');
+    return '<div class="two">'+
+      '<div class="field"><label>VIN / Nomor rangka</label><input id="viVin" value="'+v('vin')+'"></div><div class="field"><label>Engine code</label><input id="viEngine" value="'+v('engine_code')+'"></div>'+
+      '<div class="field"><label>Engine type</label><input id="viEngineType" placeholder="ICE / diesel / hybrid / BEV" value="'+v('engine_type')+'"></div><div class="field"><label>Fuel type</label><input id="viFuel" value="'+v('fuel_type')+'"></div>'+
+      '<div class="field"><label>Displacement (cc)</label><input id="viCc" type="number" min="0" value="'+v('displacement_cc')+'"></div><div class="field"><label>Cylinders</label><input id="viCyl" type="number" min="1" value="'+v('cylinders')+'"></div>'+
+      '<div class="field"><label>Aspiration</label><input id="viAsp" value="'+v('aspiration')+'"></div><div class="field"><label>Compression ratio</label><input id="viCr" type="number" min="0" step="0.01" value="'+v('compression_ratio')+'"></div>'+
+      '<div class="field"><label>Transmission</label><input id="viTrans" value="'+v('transmission_type')+'"></div><div class="field"><label>Gear count</label><input id="viGears" type="number" min="1" value="'+v('transmission_gears')+'"></div>'+
+      '<div class="field"><label>Drive layout</label><input id="viDrive" placeholder="FWD / RWD / AWD / chain" value="'+v('drive_layout')+'"></div><div class="field"><label>Berat kosong (kg)</label><input id="viWeight" type="number" min="0" step="0.1" value="'+v('curb_weight_kg')+'"></div>'+
+      '<div class="field"><label>Battery (kWh)</label><input id="viBattery" type="number" min="0" step="0.01" value="'+v('battery_kwh')+'"></div><div class="field"><label>Motor peak (kW)</label><input id="viMotorKw" type="number" min="0" step="0.01" value="'+v('motor_peak_kw')+'"></div>'+
+      '<div class="field"><label>System voltage (V)</label><input id="viVolt" type="number" min="0" step="0.1" value="'+v('system_voltage_v')+'"></div><div class="field"><label>ECU / BMS</label><input id="viEcu" value="'+v('ecu_type')+' / '+v('bms_type')+'"></div>'+
+      '</div><div class="field"><label>Catatan konfigurasi</label><textarea id="viNotes">'+v('notes')+'</textarea></div>'+
+      '<button class="btn primary" id="viSaveConfig">💾 Simpan konfigurasi</button>';
+  }
+  function componentForm(){
+    return '<div class="two"><div class="field"><label>System *</label><input id="vcSystem" placeholder="Engine / CVT / Brake / HV"></div><div class="field"><label>Component type *</label><input id="vcType" placeholder="Injector / Caliper / Battery"></div>'+
+      '<div class="field"><label>Nama *</label><input id="vcName"></div><div class="field"><label>Part number</label><input id="vcPn"></div>'+
+      '<div class="field"><label>Manufacturer</label><input id="vcMaker"></div><div class="field"><label>Status</label><select id="vcStatus"><option>installed</option><option>failed</option><option>stored</option><option>removed</option><option>unknown</option></select></div></div>'+
+      '<div class="field"><label>Catatan</label><input id="vcNotes"></div><button class="btn primary" id="viAddComponent">+ Simpan komponen</button>';
+  }
+  function modForm(){
+    return '<div class="two"><div class="field"><label>System *</label><input id="vmSystem" placeholder="Engine / Suspension / ECU"></div><div class="field"><label>Judul *</label><input id="vmTitle"></div>'+
+      '<div class="field"><label>Type</label><input id="vmType" placeholder="upgrade / replacement / tuning"></div><div class="field"><label>Risk</label><select id="vmRisk"><option>unknown</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></div>'+
+      '<div class="field"><label>Compatibility</label><select id="vmCompat"><option>unknown</option><option>compatible</option><option>conditional</option><option>verified</option><option>incompatible</option></select></div><div class="field"><label>Evidence</label><select id="vmEvidence"><option>insufficient</option><option>partial</option><option>adequate</option><option>verified</option></select></div></div>'+
+      '<div class="field"><label>Target effect</label><textarea id="vmEffect" placeholder="Target perubahan / performa"></textarea></div><div class="field"><label>Part numbers, pisahkan koma</label><input id="vmParts"></div>'+
+      '<div class="field"><label>Test plan</label><textarea id="vmTest"></textarea></div><button class="btn primary" id="viAddMod">+ Simpan modifikasi</button>';
+  }
+  function calcForm(){
+    return '<div class="field"><label>Jenis kalkulasi</label><select id="vCalcType"><option value="displacement">Displacement dari bore × stroke</option><option value="power_to_weight">Power-to-weight</option><option value="wheel_circumference">Keliling ban</option><option value="speed_from_ratio">Kecepatan dari RPM + rasio</option></select></div><div id="vCalcInputs"></div><button class="btn primary" id="viRunCalc">🧮 Hitung & Simpan</button><div id="vCalcResult" style="margin-top:10px"></div>';
+  }
+  function calcInputs(type){
+    if(type==='displacement')return '<div class="three"><div class="field"><label>Bore (mm)</label><input id="ciBore" type="number" step="0.001"></div><div class="field"><label>Stroke (mm)</label><input id="ciStroke" type="number" step="0.001"></div><div class="field"><label>Cylinders</label><input id="ciCylinders" type="number" min="1"></div></div>';
+    if(type==='power_to_weight')return '<div class="two"><div class="field"><label>Power (kW)</label><input id="ciPower" type="number" step="0.01"></div><div class="field"><label>Weight (kg)</label><input id="ciWeight2" type="number" step="0.1"></div></div>';
+    if(type==='wheel_circumference')return '<div class="two"><div class="field"><label>Tyre width (mm)</label><input id="ciWidth" type="number"></div><div class="field"><label>Aspect ratio (%)</label><input id="ciAspect" type="number"></div><div class="field"><label>Rim (inch)</label><input id="ciRim" type="number" step="0.1"></div></div>';
+    return '<div class="four"><div class="field"><label>RPM</label><input id="ciRpm" type="number"></div><div class="field"><label>Tyre diameter (m)</label><input id="ciDiameter" type="number" step="0.001"></div><div class="field"><label>Total ratio</label><input id="ciRatio" type="number" step="0.0001"></div></div>';
+  }
+  function runCalc(type){
+    let inputs={},outputs={};
+    if(type==='displacement'){const b=num(q('ciBore')?.value),s=num(q('ciStroke')?.value),c=num(q('ciCylinders')?.value);if(!(b>0&&s>0&&c>0))throw Error('Bore, stroke, cylinders wajib valid');inputs={bore_mm:b,stroke_mm:s,cylinders:c};outputs={displacement_cc:Number((Math.PI/4*b*b*s*c/1000).toFixed(3))};}
+    else if(type==='power_to_weight'){const p=num(q('ciPower')?.value),w=num(q('ciWeight2')?.value);if(!(p>0&&w>0))throw Error('Power dan berat wajib valid');inputs={power_kw:p,weight_kg:w};outputs={kw_per_tonne:Number((p/(w/1000)).toFixed(3)),hp_per_tonne:Number((p*1.3596216/(w/1000)).toFixed(3))};}
+    else if(type==='wheel_circumference'){const w=num(q('ciWidth')?.value),a=num(q('ciAspect')?.value),r=num(q('ciRim')?.value);if(!(w>0&&a>0&&r>0))throw Error('Ukuran ban wajib valid');const d=r*25.4+2*w*a/100;inputs={width_mm:w,aspect_percent:a,rim_in:r};outputs={diameter_mm:Number(d.toFixed(2)),circumference_mm:Number((Math.PI*d).toFixed(2))};}
+    else {const rpm=num(q('ciRpm')?.value),d=num(q('ciDiameter')?.value),ratio=num(q('ciRatio')?.value);if(!(rpm>0&&d>0&&ratio>0))throw Error('RPM, diameter, rasio wajib valid');inputs={rpm,tyre_diameter_m:d,total_ratio:ratio};outputs={speed_kmh:Number((rpm/ratio*Math.PI*d*60/1000).toFixed(3))};}
+    return {inputs,outputs};
+  }
+  async function saveSourceEvidence(v){
+    const title=q('veSourceTitle').value.trim(),url=q('veSourceUrl').value.trim(),claim=q('veClaim').value.trim();
+    if(!title||!claim)throw Error('Judul sumber dan claim wajib');
+    const s=await state.sb.from('evidence_sources').insert({owner_id:state.user.id,source_type:q('veSourceType').value,title,publisher:q('vePublisher').value.trim()||null,url:url||null,document_ref:q('veDoc').value.trim()||null,trust_level:q('veTrust').value});
+    if(s.error)throw s.error;
+    const sourceId=s.data?.[0]?.id;
+    if(!sourceId)throw Error('Source ID tidak terbaca');
+    const e=await state.sb.from('vehicle_evidence').insert({vehicle_id:v.id,source_id:sourceId,claim,observation:q('veObservation').value.trim()||null,confidence:Number(q('veConfidence').value||.5),verification_status:q('veStatus').value,created_by:state.user.id});
+    if(e.error)throw e.error;
+  }
+  function listRows(data){
+    if(!data.length)return '<div class="empty">Belum ada data.</div>';
+    return data.map(x=>card(x.name||x.title||x.calculation_type||x.claim||x.validation_type||'Item',
+      '<div class="small muted" style="margin-top:5px">'+esc0(x.system||x.status||x.verdict||x.verification_status||'')+'</div>'+
+      '<div class="small" style="margin-top:5px">'+esc0(x.part_number||x.target_effect||x.symptom||x.outputs&&JSON.stringify(x.outputs)||x.observation||x.notes||'')+'</div>')).join('');
+  }
+  async function renderTab(m,v,data,tab){
+    const out=q('viBody');
+    if(tab==='overview')out.innerHTML=configForm(data.config);
+    if(tab==='components')out.innerHTML=componentForm()+listRows(data.components);
+    if(tab==='mods')out.innerHTML=modForm()+listRows(data.mods);
+    if(tab==='diagnostics')out.innerHTML='<div class="field"><label>Judul kasus *</label><input id="vdTitle" placeholder="Contoh: Mesin susah hidup saat dingin"></div><div class="field"><label>Gejala *</label><textarea id="vdSymptom"></textarea></div><div class="two"><div class="field"><label>System</label><input id="vdSystem"></div><div class="field"><label>Safety</label><select id="vdSafety"><option>normal</option><option>caution</option><option>stop_use</option><option>high_voltage</option></select></div></div><button class="btn primary" id="viAddCase">+ Buka kasus diagnosis</button>'+listRows(data.cases);
+    if(tab==='calculations')out.innerHTML=calcForm()+listRows(data.calcs);
+    if(tab==='evidence')out.innerHTML='<div class="two"><div class="field"><label>Judul sumber *</label><input id="veSourceTitle"></div><div class="field"><label>Jenis sumber</label><select id="veSourceType"><option value="oem_manual">OEM Manual</option><option value="service_manual">Service Manual</option><option value="parts_catalog">Parts Catalog</option><option value="technical_bulletin">TSB</option><option value="measurement">Measurement</option><option value="inspection">Inspection</option><option value="invoice">Invoice</option><option value="photo">Photo</option><option value="user_statement">User Statement</option></select></div><div class="field"><label>Publisher</label><input id="vePublisher"></div><div class="field"><label>URL / document ref</label><input id="veSourceUrl"></div><div class="field"><label>Document ref</label><input id="veDoc"></div><div class="field"><label>Trust</label><select id="veTrust"><option>unknown</option><option>medium</option><option>high</option><option>oem</option></select></div></div><div class="field"><label>Claim *</label><textarea id="veClaim" placeholder="Contoh: OEM part number X berlaku untuk model Y"></textarea></div><div class="field"><label>Observation</label><textarea id="veObservation"></textarea></div><div class="two"><div class="field"><label>Confidence 0–1</label><input id="veConfidence" type="number" min="0" max="1" step=".01" value=".5"></div><div class="field"><label>Status</label><select id="veStatus"><option>unverified</option><option>corroborated</option><option>verified</option><option>rejected</option></select></div></div><button class="btn primary" id="viSaveEvidence">📚 Simpan evidence</button><div class="section-title">Evidence tersimpan</div>'+listRows(data.evidence)+'<div class="section-title">Validation records</div>'+listRows(data.validations);
+    bindTabActions(m,v,data,tab);
+  }
+  function bindTabActions(m,v,data,tab){
+    if(tab==='overview')q('viSaveConfig').onclick=async()=>{try{
+      const val={vehicle_id:v.id,vin:q('viVin').value.trim()||null,engine_code:q('viEngine').value.trim()||null,engine_type:q('viEngineType').value.trim()||'unknown',fuel_type:q('viFuel').value.trim()||null,displacement_cc:num(q('viCc').value),cylinders:num(q('viCyl').value),aspiration:q('viAsp').value.trim()||null,compression_ratio:num(q('viCr').value),transmission_type:q('viTrans').value.trim()||null,transmission_gears:num(q('viGears').value),drive_layout:q('viDrive').value.trim()||null,curb_weight_kg:num(q('viWeight').value),battery_kwh:num(q('viBattery').value),motor_peak_kw:num(q('viMotorKw').value),system_voltage_v:num(q('viVolt').value),ecu_type:q('viEcu').value.split('/')[0].trim()||null,bms_type:q('viEcu').value.split('/').slice(1).join('/').trim()||null,notes:q('viNotes').value.trim()||null};
+      const r=await state.sb.from('vehicle_configurations').upsert(val,{onConflict:'vehicle_id'});if(r.error)throw r.error;toast('Konfigurasi tersimpan');Object.assign(data.config,val);
+    }catch(e){toast(e.message)}};
+    if(tab==='components')q('viAddComponent').onclick=async()=>{try{const r=await state.sb.from('vehicle_components').insert({vehicle_id:v.id,system:q('vcSystem').value.trim(),component_type:q('vcType').value.trim(),name:q('vcName').value.trim(),part_number:q('vcPn').value.trim()||null,manufacturer:q('vcMaker').value.trim()||null,status:q('vcStatus').value,notes:q('vcNotes').value.trim()||null});if(r.error)throw r.error;toast('Komponen tersimpan');await open(v.id,m,'components')}catch(e){toast(e.message)}};
+    if(tab==='mods')q('viAddMod').onclick=async()=>{try{const title=q('vmTitle').value.trim(),system=q('vmSystem').value.trim();if(!title||!system)throw Error('System dan judul wajib');const r=await state.sb.from('vehicle_modifications').insert({vehicle_id:v.id,system,title,modification_type:q('vmType').value.trim()||'other',risk_level:q('vmRisk').value,compatibility_status:q('vmCompat').value,evidence_status:q('vmEvidence').value,target_effect:q('vmEffect').value.trim()||null,part_numbers:q('vmParts').value.split(',').map(x=>x.trim()).filter(Boolean),test_plan:q('vmTest').value.trim()||null});if(r.error)throw r.error;toast('Modifikasi tersimpan');await open(v.id,m,'mods')}catch(e){toast(e.message)}};
+    if(tab==='diagnostics')q('viAddCase').onclick=async()=>{try{const title=q('vdTitle').value.trim(),symptom=q('vdSymptom').value.trim();if(!title||!symptom)throw Error('Judul dan gejala wajib');const r=await state.sb.from('diagnostic_cases').insert({vehicle_id:v.id,title,symptom,suspected_system:q('vdSystem').value.trim()||null,safety_level:q('vdSafety').value,created_by:state.user.id});if(r.error)throw r.error;toast('Kasus diagnosis dibuka');await open(v.id,m,'diagnostics')}catch(e){toast(e.message)}};
+    if(tab==='calculations'){const ct=q('vCalcType');const refresh=()=>q('vCalcInputs').innerHTML=calcInputs(ct.value);ct.onchange=refresh;refresh();q('viRunCalc').onclick=async()=>{try{const r=runCalc(ct.value),ins=await state.sb.from('vehicle_calculations').insert({vehicle_id:v.id,calculation_type:ct.value,formula_version:'V1.0',inputs:r.inputs,outputs:r.outputs,assumptions:{only_verified_user_inputs:true},deterministic:true,created_by:state.user.id});if(ins.error)throw ins.error;q('vCalcResult').innerHTML=card('Hasil',esc0(JSON.stringify(r.outputs)));toast('Kalkulasi tersimpan');await open(v.id,m,'calculations')}catch(e){toast(e.message)}}}
+    if(tab==='evidence')q('viSaveEvidence').onclick=async()=>{try{await saveSourceEvidence(v);toast('Evidence tersimpan');await open(v.id,m,'evidence')}catch(e){toast(e.message)}};
+  }
+  async function open(vehicleId,existing,initial){
+    const v=state.vehicles.find(x=>x.id===vehicleId);if(!v)return;
+    const m=existing||modal('<div class="row between"><div><h3>🧬 Vehicle Intelligence</h3><div class="small muted">Digital Twin · Evidence · Diagnosis · Engineering</div></div><button class="btn gray" data-close>✕</button></div><div id="viTabsWrap"></div><div id="viBody" style="margin-top:8px"></div>');
+    if(!existing)m.querySelector('[data-close]').onclick=()=>closeModal(m);
+    try{const data=await load(v);const tab=initial||'overview';q('viTabsWrap').innerHTML=tabs(tab);document.querySelectorAll('[data-vi-tab]').forEach(b=>b.onclick=()=>open(v.id,m,b.dataset.viTab));await renderTab(m,v,data,tab)}
+    catch(e){q('viBody').innerHTML='<div class="empty">Vehicle Intelligence: '+esc0(e.message||e)+'</div>'}
+    return m;
+  }
+  window.VehicleLifebookIntelligence={open};
+})();
