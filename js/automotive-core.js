@@ -121,10 +121,10 @@ NS.diagnose=(symptom,conditions='',vehicle={})=>{const text=String(symptom||'')+
 NS.buildUniversalDiagnosticPlan=(vehicle={},symptom='',conditions='',evidence={})=>{
   const arch=universalArchitecture(vehicle);
   const d=NS.diagnose(symptom,conditions,vehicle);
+  const text=String(symptom||'').toLowerCase();
   const applicable=(d.hypotheses||[]).filter(h=>{
     if(arch.propulsion==='bev' && /Ignition|Combustion|Fuel \/ Delivery/.test(h.system)) return false;
     if(arch.propulsion==='fuel_cell' && /Ignition|Combustion/.test(h.system)) return false;
-    if(['heavy_equipment','commercial'].includes(arch.class) && h.system==='Brake / Chassis') return true;
     return true;
   });
   const gates=[];
@@ -132,19 +132,22 @@ NS.buildUniversalDiagnosticPlan=(vehicle={},symptom='',conditions='',evidence={}
   if(arch.propulsion==='unknown')gates.push('Propulsion belum terverifikasi');
   if(arch.transmission==='unknown')gates.push('Transmission belum terverifikasi');
   if(arch.drive==='unknown')gates.push('Drivetrain belum terverifikasi');
+  const safetySystems=new Set(['Brake / Chassis','Cooling / Thermal','EV / HV / BMS']);
+  const safety=safetySystems.has(applicable[0]?.system)?'CAUTION':d.safety;
+  const evidenceItems=[
+    {key:'identity',label:'Exact make/model/year/variant/market',status:(vehicle.brand&&vehicle.model&&vehicle.year)?'available':'missing'},
+    {key:'architecture',label:'Propulsion/transmission/drivetrain',status:(arch.propulsion!=='unknown'&&arch.transmission!=='unknown'&&arch.drive!=='unknown')?'available':'missing'},
+    {key:'conditions',label:'Reproducible operating conditions + baseline',status:conditions?'provided':'missing'},
+    {key:'diagnostic_data',label:'DTC/live data/physical measurements',status:evidence?.diagnostic_data?'provided':'missing'},
+    {key:'oem',label:'OEM procedure/specification for critical numeric claims',status:evidence?.oem?'provided':'required_when_applicable'}
+  ];
   return {
-    universal:true,architecture:arch,evidenceStatus:d.evidenceStatus,
-    safetyGate:d.safety,
-    gates,
-    hypotheses:applicable.map((h,i)=>({...h,sequence:i+1})),
-    evidenceRequired:[
-      'Identitas exact make/model/year/variant/market',
-      'Propulsion + transmission + drivetrain architecture',
-      'Current symptom conditions and reproducible baseline',
-      'Relevant DTC/live data or physical measurements',
-      'OEM specification/procedure when a numeric limit or safety-critical claim is required'
-    ],
-    rule:'No root cause, repair or modification may be promoted from hypothesis to confirmed without test evidence.'
+    universal:true,version:'universal-plan-v2',architecture:arch,evidenceStatus:d.evidenceStatus,
+    safetyGate:safety,gates,
+    hypotheses:applicable.map((h,i)=>({...h,sequence:i+1,confirmationStatus:'HYPOTHESIS_ONLY'})),
+    evidenceRequired:evidenceItems,
+    nextAction:gates.length?'LOCK IDENTITY/ARCHITECTURE BEFORE ROOT-CAUSE CLAIM':'RUN HIGHEST-INFORMATION SAFE TEST FIRST',
+    prohibition:'Do not convert a hypothesis into a confirmed fault, repair recommendation or modification recommendation without supporting evidence and recorded test results.'
   };
 };
 NS.buildDiagnosticTestCards=(diagnosis)=>{const out=[];(diagnosis?.hypotheses||[]).forEach(h=>(h.tests||[]).forEach(t=>out.push({hypothesis:h.system,test_name:t,expected_result:null,actual_result:null,status:'planned'})));return out;};
