@@ -604,7 +604,7 @@ function renderApp(){
  '<div class="tabs" style="margin-top:10px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">🧠 Automotive Expert '+expertLabel+'</button><button class="tab" id="exportBtn">↥ Export</button>'+ownerButton+'</div>'+
  '<section class="dashboard-stats"><div class="card stat-card"><div class="stat-icon">🚘</div><div class="stat-label">KENDARAAN</div><div class="stat-value">'+state.vehicles.length+'</div></div><div class="card stat-card"><div class="stat-icon">◷</div><div class="stat-label">AKTIVITAS</div><div class="stat-value">'+state.events.length+'</div></div><div class="card stat-card"><div class="stat-icon">Rp</div><div class="stat-label">TOTAL BIAYA</div><div class="stat-value" style="font-size:17px">'+rupiah(totalCost)+'</div></div>'+storageSummaryHtml().replace('<div class="card">','<div class="card stat-card">').replace('<div class="small muted">Cloud storage</div>','<div class="stat-icon">☁️</div><div class="stat-label">CLOUD STORAGE</div>')+'</section>'+
  '<section class="card vehicle-panel"><div class="vehicle-panel-head"><div><h3 style="margin:0">Garasi Saya</h3><div class="small muted">Pilih kendaraan untuk membuka Lifebook</div></div><button class="btn ghost" id="voiceBtn">🎙️ Voice</button></div><div class="vehicle-list">'+vehicleCards+'</div></section>'+
- (v?'<section class="selected-vehicle"><div class="card"><div class="selected-head"><div><div class="small muted">KENDARAAN TERPILIH</div><div class="selected-plate">'+esc(v.plate_number)+'</div><div class="muted small">'+esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))+'</div></div><div class="action-row"><button class="btn ghost" id="vehicleIntelBtn">🧬 Intelligence</button><button class="btn ghost" id="globalAutoBtn">🧠 Global</button><button class="btn primary" id="addEvent">＋ Aktivitas</button></div></div><div class="two" style="margin-top:17px"><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">ODOMETER</div><strong>'+ (v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km')+'</strong></div><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">AKTIVITAS TERCATAT</div><strong>'+state.events.length+'</strong></div></div></div><div class="card timeline-card"><div class="timeline-head"><div><h3 style="margin:0">Timeline</h3><div class="small muted">Jejak perawatan dan kejadian kendaraan</div></div><input id="eventSearch" placeholder="⌕  Cari aktivitas..."></div><div id="timeline" style="margin-top:13px">'+timelineHtml(state.events)+'</div></div></section>':'')+'</main></div>';
+ (v?'<section class="selected-vehicle"><div class="card"><div class="selected-head"><div><div class="small muted">KENDARAAN TERPILIH</div><div class="selected-plate">'+esc(v.plate_number)+'</div><div class="muted small">'+esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))+'</div></div><div class="action-row"><button class="btn ghost" id="vehicleIntelBtn">🧬 Intelligence</button><button class="btn ghost" id="globalAutoBtn">🧠 Global</button><button class="btn gray" id="editVehicleBtn">✏️ Edit</button><button class="btn danger" id="deleteVehicleBtn">🗑️ Hapus</button><button class="btn primary" id="addEvent">＋ Aktivitas</button></div></div><div class="two" style="margin-top:17px"><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">ODOMETER</div><strong>'+ (v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km')+'</strong></div><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">AKTIVITAS TERCATAT</div><strong>'+state.events.length+'</strong></div></div></div><div class="card timeline-card"><div class="timeline-head"><div><h3 style="margin:0">Timeline</h3><div class="small muted">Jejak perawatan dan kejadian kendaraan</div></div><input id="eventSearch" placeholder="⌕  Cari aktivitas..."></div><div id="timeline" style="margin-top:13px">'+timelineHtml(state.events)+'</div></div></section>':'')+'</main></div>';
  const logout=$('#logout');if(logout)logout.onclick=()=>state.sb.auth.signOut();
  const licenseBtn=$('#licenseBtn');if(licenseBtn)licenseBtn.onclick=()=>openUpgradeModal('Masukkan Activation Code PRO Anda.');
  const addVehicle=$('#addVehicle');if(addVehicle)addVehicle.onclick=()=>openVehicleModal();
@@ -615,6 +615,8 @@ function renderApp(){
  const addEvent=$('#addEvent');if(addEvent)addEvent.onclick=()=>openEventModal();
  const intelBtn=$('#vehicleIntelBtn');if(intelBtn)intelBtn.onclick=()=>window.VehicleLifebookIntelligence.open(state.selected);
  const globalAutoBtn=$('#globalAutoBtn');if(globalAutoBtn)globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
+ const editVehicleBtn=$('#editVehicleBtn');if(editVehicleBtn)editVehicleBtn.onclick=()=>openEditVehicleModal();
+ const deleteVehicleBtn=$('#deleteVehicleBtn');if(deleteVehicleBtn)deleteVehicleBtn.onclick=()=>deleteVehicle();
  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=async()=>{state.selected=b.dataset.vehicle;await loadEvents();renderApp()});
  document.querySelectorAll('[data-event-media]').forEach(b=>b.onclick=()=>openEventMediaModal(b.dataset.eventMedia));
  document.querySelectorAll('[data-edit-event]').forEach(b=>b.onclick=()=>openEditEventModal(b.dataset.editEvent));
@@ -751,6 +753,55 @@ function modal(inner){
  const m=document.createElement('div');m.className='modal';m.innerHTML='<div class="sheet">'+inner+'</div>';document.body.appendChild(m);m.onclick=e=>{if(e.target===m)m.remove()};return m;
 }
 function closeModal(m){m?.remove()}
+
+function openEditVehicleModal(){
+ const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
+ const val=x=>esc(x==null?'':x);
+ const m=modal('<div class="row between"><h3>✏️ Edit kendaraan</h3><button class="btn gray" data-close>✕</button></div>'+
+ '<div class="two"><div class="field"><label>Nomor kendaraan *</label><input id="evPlate" value="'+val(v.plate_number)+'"></div><div class="field"><label>Tahun</label><input id="evYear" type="number" min="1900" max="2200" value="'+val(v.year)+'"></div></div>'+
+ '<div class="two"><div class="field"><label>Merek</label><input id="evBrand" value="'+val(v.brand)+'"></div><div class="field"><label>Model</label><input id="evModel" value="'+val(v.model)+'"></div></div>'+
+ '<div class="two"><div class="field"><label>Varian</label><input id="evVariant" value="'+val(v.variant)+'"></div><div class="field"><label>Warna</label><input id="evColor" value="'+val(v.color)+'"></div></div>'+
+ '<div class="two"><div class="field"><label>VIN / Nomor rangka</label><input id="evChassis" autocomplete="off" value="'+val(v.chassis_number)+'"></div><div class="field"><label>Engine code</label><input id="evEngineCode" value="'+val(v.metadata&&v.metadata.engine_code)+'"></div></div>'+
+ '<div class="field"><label>Odometer saat ini (km)</label><input id="evOdo" type="number" min="0" value="'+val(v.current_odometer)+'"></div>'+
+ '<div class="field"><div class="row between"><label>Catatan</label><button class="btn gray" type="button" id="voiceEditVehicle">🎙️ Voice</button></div><textarea id="evNotes">'+val(v.notes)+'</textarea><div id="editVehicleVoiceStatus" class="small muted" style="margin-top:5px">Voice siap</div></div>'+
+ '<button class="btn primary" style="width:100%" id="saveEditVehicle">Simpan perubahan</button>');
+ m.querySelector('[data-close]').onclick=()=>closeModal(m);
+ m.querySelector('#voiceEditVehicle').onclick=()=>openInlineVoice('evNotes','voiceEditVehicle','editVehicleVoiceStatus');
+ m.querySelector('#saveEditVehicle').onclick=async()=>{
+  const g=id=>m.querySelector('#'+id).value.trim();
+  const plate=g('evPlate').toUpperCase();if(!plate){toast('Nomor kendaraan wajib');return}
+  const odoRaw=m.querySelector('#evOdo').value;
+  if(odoRaw!==''&&Number(odoRaw)<0){toast('Odometer tidak valid');return}
+  const payload={plate_number:plate,year:Number(g('evYear'))||null,brand:g('evBrand')||null,model:g('evModel')||null,variant:g('evVariant')||null,color:g('evColor')||null,chassis_number:g('evChassis')||null,metadata:Object.assign({},v.metadata||{},{engine_code:g('evEngineCode')||null}),notes:g('evNotes')||null};
+  const newOdo=odoRaw===''?null:Number(odoRaw);
+  if(newOdo!==(v.current_odometer==null?null:Number(v.current_odometer)))payload.current_odometer=newOdo;
+  setBusy(true);
+  try{
+   const {error}=await state.sb.from('vehicles').update(payload).eq('id',v.id);
+   if(error)throw error;
+   closeModal(m);await loadVehicles();renderApp();toast('Kendaraan diperbarui');
+  }catch(e){toast(e.message||'Gagal memperbarui kendaraan')}finally{setBusy(false)}
+ };
+}
+async function deleteVehicle(){
+ const v=currentVehicle();if(!v){toast('Pilih kendaraan dulu');return}
+ if(!confirm('Hapus kendaraan "'+v.plate_number+'"?\n\nSemua aktivitas dan foto kendaraan ini juga akan dihapus permanen.'))return;
+ if(!confirm('Konfirmasi terakhir: hapus '+v.plate_number+' beserta seluruh riwayatnya?'))return;
+ setBusy(true);
+ try{
+  const {data:media,error:me}=await state.sb.from('vehicle_media').select('id,storage_path').eq('vehicle_id',v.id);
+  if(me)throw me;
+  const paths=(media||[]).map(x=>x.storage_path).filter(Boolean);
+  if(paths.length){const {error:se}=await state.sb.storage.from('vehicle-evidence').remove(paths);if(se)throw se}
+  if((media||[]).length){const {error:de}=await state.sb.from('vehicle_media').delete().eq('vehicle_id',v.id);if(de)throw de}
+  const {error:ee}=await state.sb.from('vehicle_events').delete().eq('vehicle_id',v.id);
+  if(ee)throw ee;
+  const {error}=await state.sb.from('vehicles').delete().eq('id',v.id);
+  if(error)throw error;
+  state.selected=null;state.events=[];state.mediaByEvent={};
+  await loadVehicles();await loadStorageUsage();renderApp();toast('Kendaraan dihapus');
+ }catch(e){toast(e.message||'Gagal menghapus kendaraan')}finally{setBusy(false)}
+}
 
 function openVehicleModal(){
  if(state.plan!=='owner' && state.vehicles.length>=state.maxVehicles){openUpgradeModal('Batas paket saat ini tercapai. Aktifkan PRO untuk menambah kendaraan.');return}
