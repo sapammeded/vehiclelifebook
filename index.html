@@ -641,25 +641,37 @@ function openEventMediaModal(eventId){
  '<button class="btn primary" style="width:100%" id="uploadEventPhotos">⬆️ Simpan Foto ke Aktivitas</button>');
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
  let selected=[];
+ const isImageFile=f=>!!f&&(/^image\\//i.test(f.type||'')||/\\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name||''));
+ const collectFiles=list=>{
+   const incoming=Array.from(list||[]).filter(isImageFile);
+   for(const f of incoming){
+     if(!selected.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))selected.push(f);
+   }
+   const label=m.querySelector('#eventPhotoCount');
+   if(label)label.textContent=selected.length?selected.length+' foto baru dipilih':'Belum ada foto baru';
+ };
  const render=()=>{
    const old=state.mediaByEvent?.[eventId]||[],grid=m.querySelector('#eventMediaGrid');
    grid.innerHTML=(old.length?old.map(x=>'<div class="media-card">'+(x.signed_url?'<img src="'+esc(x.signed_url)+'" alt="'+esc(x.file_name||'Foto')+'">':'<div class="media-missing">Foto tidak tersedia</div>')+'<button class="btn gray media-delete" data-media="'+esc(x.id)+'" type="button">Hapus</button></div>').join(''):'<div class="small muted">Belum ada foto.</div>');
    grid.querySelectorAll('[data-media]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus foto ini dari aktivitas?'))return;setBusy(true);try{const id=b.dataset.media,row=old.find(x=>x.id===id);if(row)await state.sb.storage.from('vehicle-evidence').remove([row.storage_path]);const {error}=await state.sb.from('vehicle_media').delete().eq('id',id);if(error)throw error;await loadEventMedia();render();renderApp()}catch(err){toast(err.message||'Gagal menghapus foto')}finally{setBusy(false)}});
  };
  render();
- const add=list=>{selected.push(...Array.from(list||[]).filter(f=>/^image\\//i.test(f.type)));m.querySelector('#eventPhotoCount').textContent=selected.length+' foto baru dipilih'};
- m.querySelector('#eventPhotos').onchange=e=>add(e.target.files);
- m.querySelector('#eventCameraBtn').onclick=()=>m.querySelector('#eventCamera').click();
- m.querySelector('#eventCamera').onchange=e=>add(e.target.files);
+ const photoInput=m.querySelector('#eventPhotos'),cameraInput=m.querySelector('#eventCamera');
+ photoInput.addEventListener('change',e=>collectFiles(e.target.files));
+ photoInput.addEventListener('input',e=>collectFiles(e.target.files));
+ m.querySelector('#eventCameraBtn').onclick=()=>cameraInput.click();
+ cameraInput.addEventListener('change',e=>collectFiles(e.target.files));
  m.querySelector('#uploadEventPhotos').onclick=async()=>{
-   if(!selected.length){toast('Pilih foto dulu');return}
+   // Android WebView/Chrome can show the chosen filename before the change handler updates app state.
+   collectFiles([...(photoInput.files||[]),...(cameraInput.files||[])]);
+   if(!selected.length){toast('Foto belum terbaca. Pilih ulang file JPG/PNG, lalu tunggu nama foto muncul sebagai foto terpilih.');return}
    setBusy(true);let ok=0,fail=0;
    try{
      const uploadErrors=[];
      for(let n=0;n<selected.length;n++){
        const file=selected[n];
        try{
-         if(!file || !/^image\\//i.test(file.type))throw new Error('File bukan gambar yang didukung.');
+         if(!isImageFile(file))throw new Error('File bukan gambar yang didukung.');
          const packed=await compressMediaFile(file);
          if(packed.blob.size>9*1024*1024)throw new Error('Foto masih terlalu besar setelah dikompres. Coba foto lain.');
          const uid=()=>window.crypto&&typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
