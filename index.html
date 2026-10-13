@@ -649,6 +649,14 @@ function openEventMediaModal(eventId){
    }
    const label=m.querySelector('#eventPhotoCount');
    if(label)label.textContent=selected.length?selected.length+' foto baru dipilih':'Belum ada foto baru';
+   const button=m.querySelector('#uploadEventPhotos');
+   if(button&&selected.length)button.textContent='⬆️ Simpan '+selected.length+' Foto ke Aktivitas';
+ };
+ const syncFiles=()=>{
+   // Use FileList from the actual input; some Android pickers return an empty MIME type.
+   const files=[...(photoInput?.files||[]),...(cameraInput?.files||[])];
+   collectFiles(files);
+   return files;
  };
  const render=()=>{
    const old=state.mediaByEvent?.[eventId]||[],grid=m.querySelector('#eventMediaGrid');
@@ -657,14 +665,18 @@ function openEventMediaModal(eventId){
  };
  render();
  const photoInput=m.querySelector('#eventPhotos'),cameraInput=m.querySelector('#eventCamera');
- photoInput.addEventListener('change',e=>collectFiles(e.target.files));
- photoInput.addEventListener('input',e=>collectFiles(e.target.files));
+ photoInput.addEventListener('change',()=>syncFiles());
+ photoInput.addEventListener('input',()=>syncFiles());
  m.querySelector('#eventCameraBtn').onclick=()=>cameraInput.click();
- cameraInput.addEventListener('change',e=>collectFiles(e.target.files));
+ cameraInput.addEventListener('change',()=>syncFiles());
  m.querySelector('#uploadEventPhotos').onclick=async()=>{
-   // Android WebView/Chrome can show the chosen filename before the change handler updates app state.
-   collectFiles([...(photoInput.files||[]),...(cameraInput.files||[])]);
-   if(!selected.length){toast('Foto belum terbaca. Pilih ulang file JPG/PNG, lalu tunggu nama foto muncul sebagai foto terpilih.');return}
+   const liveFiles=syncFiles();
+   // If the browser shows a filename but exposes no File object, explain the actual problem.
+   if(!selected.length){
+     const filename=(photoInput.value||cameraInput.value||'').split(/[\\/]/).pop();
+     toast(filename?'Browser menampilkan nama file, tetapi file tidak bisa dibaca. Muat ulang halaman lalu coba pilih ulang.':'Pilih foto lewat tombol Choose Files terlebih dahulu.');
+     return;
+   }
    setBusy(true);let ok=0,fail=0;
    try{
      const uploadErrors=[];
