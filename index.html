@@ -641,9 +641,10 @@ function openEventMediaModal(eventId){
  '<button class="btn primary" style="width:100%" id="uploadEventPhotos">⬆️ Simpan Foto ke Aktivitas</button>');
  m.querySelector('[data-close]').onclick=()=>closeModal(m);
  let selected=[];
- const isImageFile=f=>!!f&&(/^image\\//i.test(f.type||'')||/\\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name||''));
+ const isImageFile=f=>!!f&&(/^image\//i.test(f.type||'')||/\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name||''));
  const collectFiles=list=>{
    const incoming=Array.from(list||[]).filter(isImageFile);
+   selected.length=0;
    for(const f of incoming){
      if(!selected.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))selected.push(f);
    }
