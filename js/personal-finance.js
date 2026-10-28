@@ -10,7 +10,9 @@ const payday=(y,m,day)=>new Date(y,m,Math.min(Number(day)||25,daysIn(y,m)),12);
 const addMonths=(d,n,day)=>payday(d.getFullYear(),d.getMonth()+n,day);
 const fmtDate=d=>new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'short',year:'numeric'}).format(d);
 const periodLabel=(a,b)=>fmtDate(a)+' – '+fmtDate(b);
-let ctx=null,profile=null,transactions=[],periodOffset=0,recognition=null;
+let ctx=null,profile=null,transactions=[],vehicleEvents=[],periodOffset=0,recognition=null;
+function sharedPeriodDay(){try{const x=JSON.parse(localStorage.getItem('VL_SHARED_PERIOD_V1_'+String(ctx?.user?.id||'guest'))||'{}');if(x.start_day)return Math.min(31,Math.max(1,Number(x.start_day)||28));const old=JSON.parse(localStorage.getItem('VL_VEHICLE_PERIOD_V1_'+String(ctx?.user?.id||'guest'))||'{}');return Math.min(31,Math.max(1,Number(old.start_day)||28))}catch{return 28}}
+const anchor=(y,m,day)=>new Date(y,m,Math.min(Math.max(1,Number(day)||28),daysIn(y,m)),12);
 function toast(msg){if(ctx?.toast)ctx.toast(msg);else alert(msg)}
 function currentPayday(){
  const now=parseDate(localToday()),day=Number(profile?.payday_day)||25;
@@ -21,10 +23,11 @@ function currentPayday(){
  return p;
 }
 function period(offset=0){
- const day=Number(profile?.payday_day)||25;
- const current=currentPayday();
- const start=addMonths(current,offset,day);
- const next=addMonths(start,1,day);
+ const day=sharedPeriodDay(),now=parseDate(localToday());
+ let current=anchor(now.getFullYear(),now.getMonth(),day);
+ if(current>now)current=anchor(now.getFullYear(),now.getMonth()-1,day);
+ const start=anchor(current.getFullYear(),current.getMonth()+offset,day);
+ const next=anchor(start.getFullYear(),start.getMonth()+1,day);
  const end=new Date(next);end.setDate(end.getDate()-1);
  return {start,end,next};
 }
@@ -53,11 +56,13 @@ function cycleTransactions(p){
 }
 function cycleStats(p){
  const rows=cycleTransactions(p);
- const salary=profile?.salary_start_date&&iso(p.start)>=profile.salary_start_date&&Number(profile.monthly_salary)>0?Number(profile.monthly_salary):0;
+ const exclusive=new Date(p.end);exclusive.setDate(exclusive.getDate()+1);
+ const salary=salaryDatesBefore(iso(exclusive)).filter(d=>d>=p.start&&d<=p.end).length*Number(profile?.monthly_salary||0);
  const income=rows.filter(t=>t.direction==='income').reduce((s,t)=>s+Number(t.amount),0);
  const expense=rows.filter(t=>t.direction==='expense').reduce((s,t)=>s+Number(t.amount),0);
- const carry=carryBefore(p.start);
- return {rows,salary,income,expense,carry,balance:carry+salary+income-expense};
+ const vehicleExpense=vehicleEvents.filter(e=>{const d=String(e.event_date||'').slice(0,10);return d>=iso(p.start)&&d<=iso(p.end)}).reduce((sum,e)=>sum+Number(e.total_cost||0),0);
+ const carry=carryBefore(p.start),totalExpense=expense+vehicleExpense;
+ return {rows,salary,income,expense,vehicleExpense,totalExpense,carry,balance:carry+salary+income-totalExpense};
 }
 function amountFromToken(token){
  let s=String(token).toLowerCase().replace(/rp\.?/g,'').trim();
@@ -105,13 +110,16 @@ function parseEntries(text,direction){
 }
 async function loadData(){
  const sb=ctx.sb,user=ctx.user;
- const [p,t]=await Promise.all([
+ const [p,t,vehicles]=await Promise.all([
   sb.from('finance_profiles').select('*').eq('user_id',user.id).maybeSingle(),
-  sb.from('finance_transactions').select('*').eq('user_id',user.id).order('occurred_on',{ascending:false}).order('created_at',{ascending:false}).limit(5000)
+  sb.from('finance_transactions').select('*').eq('user_id',user.id).order('occurred_on',{ascending:false}).order('created_at',{ascending:false}).limit(5000),
+  sb.from('vehicles').select('id').eq('user_id',user.id)
  ]);
- if(p.error)throw p.error;if(t.error)throw t.error;
+ if(p.error)throw p.error;if(t.error)throw t.error;if(vehicles.error)throw vehicles.error;
  profile=p.data||{user_id:user.id,monthly_salary:0,payday_day:25,salary_start_date:localToday(),currency:'IDR'};
  transactions=t.data||[];
+ const vehicleIds=(vehicles.data||[]).map(x=>x.id);
+ if(vehicleIds.length){const ev=await sb.from('vehicle_timeline').select('vehicle_id,event_date,total_cost').in('vehicle_id',vehicleIds);if(ev.error)throw ev.error;vehicleEvents=ev.data||[]}else vehicleEvents=[];
 }
 function open(){
  ctx=window.VehicleLifebookFinanceContext?.();
@@ -132,8 +140,8 @@ function render(){
  root.innerHTML='<div class="row between" style="gap:12px"><div><div class="small muted">VEHICLE LIFEBOOK · PERSONAL FINANCE</div><h2 style="margin:3px 0">💰 Keuangan Pribadi</h2><div class="small muted">Catat uang keluar/masuk lewat teks atau suara.</div></div><button class="btn gray" id="finClose">✕ Tutup</button></div>'+
  '<div class="row wraprow" style="margin:14px 0"><button class="btn primary" id="finDashboard">Ringkasan</button><button class="btn ghost" id="finSettings">⚙️ Gaji & Gajian</button><button class="btn ghost" id="finAll">Semua transaksi</button></div>'+
  (!salaryConfigured?'<div class="card" style="background:#fffbeb;border-color:#fde68a;margin-bottom:12px"><strong>Atur gaji bulanan dulu</strong><div class="small muted">Masukkan nominal gaji dan tanggal gajian agar saldo dan siklus bulanan dapat dihitung.</div><button class="btn primary" id="finSetup" style="margin-top:9px">Atur sekarang</button></div>':'')+
- '<div class="card" style="background:linear-gradient(135deg,#0f172a,#1e40af);color:#fff;border:0"><div class="small" style="color:#bfdbfe">SALDO BERJALAN · TERMASUK SALDO TERBAWA</div><div style="font-size:clamp(25px,6vw,34px);font-weight:700;margin:5px 0">'+money(s.balance)+'</div><div class="small" style="color:#dbeafe">Periode '+esc(periodLabel(p.start,p.end))+'</div><div class="row between wraprow" style="margin-top:14px"><button class="btn" id="finPrev" style="background:#fff;color:#0f172a">← Periode lalu</button><button class="btn" id="finNext" style="background:#fff;color:#0f172a" '+(periodOffset>=0?'disabled':'')+'>Periode berikut →</button></div></div>'+
- '<div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px"><div class="card"><div class="small muted">Gaji periode ini</div><div style="font-size:18px;font-weight:700;color:#047857">'+money(s.salary)+'</div></div><div class="card"><div class="small muted">Pengeluaran</div><div style="font-size:18px;font-weight:700;color:#dc2626">'+money(s.expense)+'</div></div><div class="card"><div class="small muted">Pemasukan tambahan</div><div style="font-size:18px;font-weight:700">'+money(s.income)+'</div></div><div class="card"><div class="small muted">Saldo terbawa</div><div style="font-size:18px;font-weight:700">'+money(s.carry)+'</div></div></div>'+
+ '<div class="card" style="background:linear-gradient(135deg,#0f172a,#1e40af);color:#fff;border:0"><div class="small" style="color:#bfdbfe">SISA UANG · TERMASUK SALDO TERBAWA</div><div style="font-size:clamp(25px,6vw,34px);font-weight:700;margin:5px 0">'+money(s.balance)+'</div><div class="small" style="color:#dbeafe">Periode '+esc(periodLabel(p.start,p.end))+' · mulai tanggal '+sharedPeriodDay()+'</div><div class="row between wraprow" style="margin-top:14px"><button class="btn" id="finPrev" style="background:#fff;color:#0f172a">← Periode lalu</button><button class="btn" id="finNext" style="background:#fff;color:#0f172a" '+(periodOffset>=0?'disabled':'')+'>Periode berikut →</button></div></div>'+
+ '<div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px"><div class="card"><div class="small muted">Gaji periode ini</div><div style="font-size:18px;font-weight:700;color:#047857">'+money(s.salary)+'</div></div><div class="card"><div class="small muted">Biaya hidup / transaksi</div><div style="font-size:18px;font-weight:700;color:#dc2626">'+money(s.expense)+'</div></div><div class="card"><div class="small muted">Pengeluaran kendaraan</div><div style="font-size:18px;font-weight:700;color:#dc2626">'+money(s.vehicleExpense)+'</div></div><div class="card"><div class="small muted">Total uang terpakai</div><div style="font-size:18px;font-weight:700;color:#b91c1c">'+money(s.totalExpense)+'</div></div><div class="card"><div class="small muted">Pemasukan tambahan</div><div style="font-size:18px;font-weight:700">'+money(s.income)+'</div></div><div class="card"><div class="small muted">Saldo terbawa</div><div style="font-size:18px;font-weight:700">'+money(s.carry)+'</div></div></div>'+
  '<div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Catat transaksi</h3><span class="badge">Teks panjang</span></div><div class="field" style="margin-top:12px"><label>Jenis catatan</label><select id="finDirection"><option value="expense">💸 Pengeluaran</option><option value="income">💰 Pemasukan</option></select></div><div class="field"><label>Tulis bebas — satu transaksi per baris atau pisahkan dengan koma</label><textarea id="finText" rows="5" style="min-height:130px" placeholder="Contoh: Beli bensin 50 ribu, makan siang 25 ribu, kasih istri 500 ribu, beli rokok 30 ribu."></textarea><div class="small muted">Nominal seperti 50 ribu, 1,5 juta, atau Rp 125.000 bisa dibaca. Periksa catatan sebelum menyimpan.</div></div><div class="row wraprow"><button class="btn ghost" id="finVoice">🎙️ Bicara</button><button class="btn primary" id="finSave" style="flex:1">Simpan transaksi</button></div><div id="finVoiceStatus" class="small muted" style="margin-top:6px"></div></div>'+
  (topCats.length?'<div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Pengeluaran terbesar</h3>'+topCats.map(([c,v])=>'<div class="row between" style="padding:6px 0"><span>'+esc(c)+'</span><strong>'+money(v)+'</strong></div>').join('')+'</div>':'')+
  '<div class="card" style="margin-top:12px"><div class="row between"><h3 style="margin:0">Transaksi periode ini</h3><span class="badge">'+s.rows.length+' catatan</span></div><div style="margin-top:8px">'+(s.rows.length?s.rows.slice(0,60).map(t=>txHtml(t)).join(''):'<div class="empty">Belum ada transaksi pada periode ini.</div>')+'</div></div>';
