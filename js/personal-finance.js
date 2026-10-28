@@ -113,7 +113,7 @@ async function loadData(){
  const [p,t,vehicles]=await Promise.all([
   sb.from('finance_profiles').select('*').eq('user_id',user.id).maybeSingle(),
   sb.from('finance_transactions').select('*').eq('user_id',user.id).order('occurred_on',{ascending:false}).order('created_at',{ascending:false}).limit(5000),
-  sb.from('vehicles').select('id').eq('user_id',user.id)
+  sb.from('vehicles').select('id').eq('owner_id',user.id)
  ]);
  if(p.error)throw p.error;if(t.error)throw t.error;if(vehicles.error)throw vehicles.error;
  profile=p.data||{user_id:user.id,monthly_salary:0,payday_day:25,salary_start_date:localToday(),currency:'IDR'};
@@ -130,7 +130,7 @@ function open(){
  modal.innerHTML='<div class="sheet" style="max-width:760px"><div id="financeContent"><div class="empty">Memuat data keuangan…</div></div></div>';
  document.body.appendChild(modal);
  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
- loadData().then(()=>render()).catch(e=>{const c=document.getElementById('financeContent');if(c)c.innerHTML='<div class="row between"><h3>Keuangan Pribadi</h3><button class="btn gray" id="finClose">Tutup</button></div><div class="card"><strong>Database keuangan belum siap.</strong><p class="small muted">Jalankan migration SQL di supabase/migrations/20261028120000_add_personal_finance_manager.sql pada Supabase SQL Editor, lalu coba lagi.</p><div class="small">'+esc(e.message||e)+'</div></div>';document.getElementById('finClose')?.addEventListener('click',()=>modal.remove())});
+ loadData().then(()=>render()).catch(e=>{const c=document.getElementById('financeContent');if(c)c.innerHTML='<div class="row between"><h3>Keuangan Pribadi</h3><button class="btn gray" id="finClose">Tutup</button></div><div class="card"><strong>Keuangan gagal memuat data.</strong><p class="small muted">Periksa detail error di bawah. Jika pesan menyebut kolom atau izin database, perbaiki sesuai error tersebut; jangan menjalankan migration berulang tanpa memastikan penyebabnya.</p><div class="small">'+esc(e.message||e)+'</div></div>';document.getElementById('finClose')?.addEventListener('click',()=>modal.remove())});
 }
 function render(){
  const root=document.getElementById('financeContent');if(!root)return;
