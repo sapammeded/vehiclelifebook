@@ -43,8 +43,10 @@ function txBefore(date){
  return transactions.filter(t=>t.occurred_on<cutoff).reduce((s,t)=>s+(t.direction==='income'?1:-1)*Number(t.amount),0);
 }
 function carryBefore(date){
- const salary=salaryDatesBefore(iso(date)).length*Number(profile?.monthly_salary||0);
- return salary+txBefore(date);
+ const cutoff=iso(date);
+ const salary=salaryDatesBefore(cutoff).length*Number(profile?.monthly_salary||0);
+ const vehicleSpent=vehicleEvents.filter(e=>String(e.event_date||'').slice(0,10)<cutoff).reduce((sum,e)=>sum+Number(e.total_cost||0),0);
+ return salary+txBefore(date)-vehicleSpent;
 }
 function cycleTransactions(p){
  return transactions.filter(t=>t.occurred_on>=iso(p.start)&&t.occurred_on<=iso(p.end)).sort((a,b)=>b.occurred_on.localeCompare(a.occurred_on)||String(b.created_at).localeCompare(String(a.created_at)));
