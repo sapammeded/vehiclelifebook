@@ -81,7 +81,7 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
 // Welcome media: upload your own file to this exact repo path. No code change needed.
 const WELCOME_VIDEO='assets/welcome/welcome.mp4';
 const state={sb:null,user:null,vehicles:[],selected:null,events:[],mediaByEvent:{},storageUsage:null,busy:false,voice:null,plan:'demo',configuredPlan:'demo',accessValid:true,accessState:'demo',license:null,licenseStatus:null,licenseExpiresAt:null,maxVehicles:1,maxEvents:20};
-window.VehicleLifebookFinanceContext=()=>({sb:state.sb,user:state.user,toast});
+window.VehicleLifebookFinanceContext=()=>({sb:state.sb,user:state.user,events:state.events,vehicles:state.vehicles,toast});
 window.VehicleLifebookPeriodContext=()=>({sb:state.sb,user:state.user,vehicles:state.vehicles,selected:state.selected,events:state.events,toast,timelineHtml,openEventMediaModal,openEditEventModal,deleteEvent,renderApp});
 
 const $=s=>document.querySelector(s);
