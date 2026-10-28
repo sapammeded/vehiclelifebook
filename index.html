@@ -69,8 +69,8 @@ body{background:linear-gradient(180deg,#f8faff 0,#f4f6fb 55%,#f7f8fc 100%)}
 <script src="js/global-automotive-intelligence.js?v=20260930-0100"></script>
 <script src="js/automotive-ai-guard.js?v=20260930-0300"></script>
 <script src="js/vehicle-intelligence-ui.js?v=20260930-0600"></script>
-<script src="js/personal-finance.js?v=20261028-2"></script>
-<script src="js/vehicle-periods.js?v=20261028-2"></script>
+<script src="js/personal-finance.js?v=20261028-4"></script>
+<script src="js/vehicle-periods.js?v=20261028-4"></script>
 <script>
 'use strict';
 
@@ -332,25 +332,27 @@ function openExpertModal(){
    m.querySelector('#copyPrompt').onclick=async()=>{try{await navigator.clipboard.writeText(p);toast('Prompt berhasil disalin')}catch{const ta=document.createElement('textarea');ta.value=p;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Prompt berhasil disalin')}};
  };
 }
+let exportDateRange={from:'',to:''};
+function captureExportRange(){exportDateRange={from:document.getElementById('exportFrom')?.value||'',to:document.getElementById('exportTo')?.value||''}}
+function exportRangeEvents(){const from=exportDateRange.from||document.getElementById('exportFrom')?.value||'',to=exportDateRange.to||document.getElementById('exportTo')?.value||'';return state.events.filter(e=>(!from||String(e.event_date)>=from)&&(!to||String(e.event_date)<=to))}
 async function exportXlsx(){
- await ensureExportEngine('xlsx');
- if(!state.events.length){toast('Belum ada data untuk diekspor');return}
- const v=currentVehicle(), rows=state.events.map(e=>({Tanggal:e.event_date,Jenis:e.event_type,Judul:e.title,Biaya:Number(e.total_cost||0),Odometer:e.odometer??'',Deskripsi:e.description||'',Sumber:e.source||''}));
- const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
- ws['!cols']=[{wch:14},{wch:14},{wch:34},{wch:18},{wch:16},{wch:60},{wch:14}];
- ws['!freeze']={xSplit:0,ySplit:1}; ws['!autofilter']={ref:XLSX.utils.encode_range(ws['!ref'])};
- const range=XLSX.utils.decode_range(ws['!ref']);
- const border={top:{style:'thin',color:{rgb:'D9E1EA'}},bottom:{style:'thin',color:{rgb:'D9E1EA'}},left:{style:'thin',color:{rgb:'D9E1EA'}},right:{style:'thin',color:{rgb:'D9E1EA'}}};
- for(let C=range.s.c;C<=range.e.c;C++){const cell=ws[XLSX.utils.encode_cell({r:0,c:C})];if(cell)cell.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1E3A8A'}},alignment:{vertical:'center',horizontal:'center',wrapText:true},border};}
- for(let R=1;R<=range.e.r;R++)for(let C=range.s.c;C<=range.e.c;C++){const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];if(cell)cell.s={border,alignment:{vertical:'top',wrapText:true}};}
- XLSX.utils.book_append_sheet(wb,ws,'Timeline');
- const info=XLSX.utils.json_to_sheet([{Field:'Kendaraan',Value:[v?.brand,v?.model,v?.year].filter(Boolean).join(' ')},{Field:'Plat',Value:v?.plate_number||''},{Field:'Odometer',Value:v?.current_odometer??''}]);
- info['!cols']=[{wch:20},{wch:45}];
- const ir=XLSX.utils.decode_range(info['!ref']);for(let C=ir.s.c;C<=ir.e.c;C++){const cell=info[XLSX.utils.encode_cell({r:0,c:C})];if(cell)cell.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0F172A'}},border,alignment:{vertical:'center'}};}
- for(let R=1;R<=ir.e.r;R++)for(let C=ir.s.c;C<=ir.e.c;C++){const cell=info[XLSX.utils.encode_cell({r:R,c:C})];if(cell)cell.s={border,alignment:{vertical:'top',wrapText:true}};}
- XLSX.utils.book_append_sheet(wb,info,'Vehicle');
- XLSX.writeFile(wb,`vehicle-lifebook-${(v?.plate_number||'vehicle').replace(/\\s+/g,'-')}.xlsx`);
- toast('Excel XLSX selesai');
+ await ensureExportEngine('xlsx');const events=exportRangeEvents();if(!events.length){toast('Tidak ada aktivitas pada rentang tanggal ini');return}
+ const v=currentVehicle(),rows=events.map(e=>({Tanggal:e.event_date,Jenis:e.event_type,Judul:e.title,Biaya:Number(e.total_cost||0),Odometer:e.odometer??'',Deskripsi:e.description||'',Sumber:e.source||''}));
+ const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:14},{wch:14},{wch:34},{wch:18},{wch:16},{wch:60},{wch:14}];ws['!freeze']={xSplit:0,ySplit:1};ws['!autofilter']={ref:XLSX.utils.encode_range(ws['!ref'])};XLSX.utils.book_append_sheet(wb,ws,'Timeline');
+ const info=XLSX.utils.json_to_sheet([{Field:'Kendaraan',Value:[v?.brand,v?.model,v?.year].filter(Boolean).join(' ')},{Field:'Plat',Value:v?.plate_number||''},{Field:'Odometer',Value:v?.current_odometer??''},{Field:'Tanggal Mulai',Value:exportDateRange.from||'Semua'},{Field:'Tanggal Akhir',Value:exportDateRange.to||'Semua'},{Field:'Petunjuk',Value:'Untuk impor, jangan ubah nama kolom pada sheet Timeline.'}]);info['!cols']=[{wch:20},{wch:45}];XLSX.utils.book_append_sheet(wb,info,'Petunjuk');
+ try{const {data,error}=await state.sb.from('finance_transactions').select('occurred_on,direction,amount,note,category,source_text').eq('user_id',state.user.id).order('occurred_on',{ascending:true});if(error)throw error;const from=exportDateRange.from,to=exportDateRange.to;const fin=(data||[]).filter(x=>(!from||x.occurred_on>=from)&&(!to||x.occurred_on<=to)).map(x=>({Tanggal:x.occurred_on,Arah:x.direction==='income'?'Pemasukan':'Pengeluaran',Jumlah:Number(x.amount||0),Catatan:x.note,Kategori:x.category||'Lainnya',Sumber:x.source_text||''}));if(fin.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(fin),'Keuangan')}catch(e){console.warn('Sheet keuangan tidak disertakan',e)}
+ XLSX.writeFile(wb,'vehicle-lifebook-'+(v?.plate_number||'vehicle').replace(/\\s+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.xlsx');toast('Excel selesai • '+events.length+' aktivitas kendaraan');
+}
+async function importXlsxFile(file){
+ await ensureExportEngine('xlsx');const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),ts=wb.Sheets.Timeline,fs=wb.Sheets.Keuangan;if(!ts&&!fs)throw new Error('Sheet tidak dikenali. Gunakan Excel ekspor Vehicle Lifebook.');
+ const vr=ts?XLSX.utils.sheet_to_json(ts,{defval:''}):[],fr=fs?XLSX.utils.sheet_to_json(fs,{defval:''}):[],vrows=vr.filter(r=>r.Tanggal&&r.Judul),frows=fr.filter(r=>r.Tanggal&&r.Jumlah&&r.Catatan);
+ if(!vrows.length&&!frows.length)throw new Error('Tidak ada baris data yang bisa diimpor.');
+ if(!confirm('Tambahkan '+vrows.length+' aktivitas kendaraan dan '+frows.length+' transaksi keuangan? Data lama tidak dihapus. Jangan impor file yang sama dua kali.'))return;
+ let vok=0,fok=0,fail=[];
+ for(const r of vrows){try{const date=String(r.Tanggal).slice(0,10);if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))throw Error('Tanggal harus YYYY-MM-DD');const {error}=await state.sb.rpc('create_vehicle_event',{p_vehicle_id:state.selected,p_event_type:String(r.Jenis||'other'),p_event_date:date,p_title:String(r.Judul).slice(0,200),p_description:String(r.Deskripsi||'')||null,p_total_cost:Math.max(0,Number(r.Biaya)||0),p_odometer:r.Odometer===''||r.Odometer==null?null:Math.max(0,Number(r.Odometer)||0),p_source:'import_excel',p_raw_input:null,p_metadata:{imported_from:'xlsx'},p_detail:{}});if(error)throw error;vok++}catch(e){fail.push('Kendaraan '+r.Judul+': '+(e.message||e))}}
+ const payload=frows.map(r=>({user_id:state.user.id,occurred_on:String(r.Tanggal).slice(0,10),direction:/pemasukan|income/i.test(String(r.Arah))?'income':'expense',amount:Number(r.Jumlah),note:String(r.Catatan).slice(0,250),category:String(r.Kategori||'Lainnya').slice(0,80),source_text:String(r.Sumber||'Impor Excel').slice(0,500)})).filter(x=>/^\\d{4}-\\d{2}-\\d{2}$/.test(x.occurred_on)&&x.amount>0&&x.note);
+ for(let i=0;i<payload.length;i+=100){try{const {error}=await state.sb.from('finance_transactions').insert(payload.slice(i,i+100));if(error)throw error;fok+=payload.slice(i,i+100).length}catch(e){fail.push('Keuangan: '+(e.message||e))}}
+ await loadVehicles();renderApp();if(fail.length)console.warn('Impor parsial',fail);toast('Impor selesai • '+vok+' aktivitas, '+fok+' transaksi'+(fail.length?' • '+fail.length+' gagal, detail di console':''));
 }
 async function fileToExportImage(file){
  return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error||new Error("Gagal membaca foto"));reader.onload=()=>{const img=new Image();img.onload=()=>{const max=1600,scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height)),w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve({name:file.name,dataUrl:canvas.toDataURL("image/jpeg",.84),width:w,height:h})};img.onerror=()=>reject(new Error("Format foto tidak bisa dibaca"));img.src=reader.result};reader.readAsDataURL(file)})
@@ -1016,20 +1018,22 @@ function openUpgradeModal(msg=''){
 }
 
 function openExportModal(){
- const m=modal(`<div class="row between"><h3>Export Lifebook</h3><button class="btn gray" data-close>✕</button></div>
- <p class="muted small">PDF dan Word (.docx) bisa membawa foto dari galeri atau kamera. Foto diproses lokal di browser dan dikompres agar file tetap ringan.</p>
+ const m=modal(`<div class="row between"><h3>Ekspor & Impor Lifebook</h3><button class="btn gray" data-close>✕</button></div>
+ <p class="muted small">Pilih rentang tanggal bila perlu. Excel memuat aktivitas kendaraan dan transaksi keuangan. Impor menambahkan data, tidak menghapus data lama.</p>
+ <div class="two"><div class="field"><label>Dari tanggal (opsional)</label><input type="date" id="exportFrom"></div><div class="field"><label>Sampai tanggal (opsional)</label><input type="date" id="exportTo"></div></div>
  <div class="field"><label>Foto untuk PDF / Word</label><input id="exportPhotos" type="file" accept="image/*" multiple><input id="exportCamera" type="file" accept="image/*" capture="environment" class="hidden"><div class="row" style="margin-top:8px"><button class="btn gray" type="button" id="cameraPhoto">📷 Kamera</button><span id="photoCount" class="small muted">Belum ada foto</span></div><div id="photoPreview" class="row wraprow" style="margin-top:8px"></div></div>
  <div class="two"><button class="btn primary" id="pdfOut">📄 PDF + FOTO</button><button class="btn ghost" id="docxOut">📝 Word + FOTO</button></div>
- <button class="btn gray" style="width:100%;margin-top:9px" id="xlsxOut">📊 Excel XLSX</button>`);
+ <button class="btn gray" style="width:100%;margin-top:9px" id="xlsxOut">📊 Excel lengkap (.xlsx)</button>
+ <div class="field" style="margin-top:14px"><label>Impor Excel (.xlsx / .xls)</label><input id="xlsxImport" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"><div class="small muted" style="margin-top:6px">Pilih kendaraan tujuan. File harus memiliki sheet Timeline dan/atau Keuangan dari format Vehicle Lifebook. PDF tidak bisa diimpor langsung.</div><button class="btn primary" style="width:100%;margin-top:8px" id="importXlsx">⬆️ Impor Excel</button></div>`);
  m.querySelector('[data-close]').onclick=()=>closeModal(m);let selectedFiles=[];
  const refreshPhotos=()=>{const box=m.querySelector("#photoPreview"),count=m.querySelector("#photoCount");count.textContent=selectedFiles.length?selectedFiles.length+" foto dipilih":"Belum ada foto";box.innerHTML="";selectedFiles.slice(0,12).forEach(f=>{const u=URL.createObjectURL(f),im=document.createElement("img");im.src=u;im.className="photo-thumb";box.appendChild(im);setTimeout(()=>URL.revokeObjectURL(u),3000)})};
- const addFiles=list=>{selectedFiles.push(...Array.from(list||[]).filter(f=>/^image\//i.test(f.type)));refreshPhotos()};
+ const addFiles=list=>{selectedFiles.push(...Array.from(list||[]).filter(f=>/^image\\//i.test(f.type)));refreshPhotos()};
  m.querySelector("#exportPhotos").onchange=e=>addFiles(e.target.files);m.querySelector("#cameraPhoto").onclick=()=>m.querySelector("#exportCamera").click();m.querySelector("#exportCamera").onchange=e=>addFiles(e.target.files);
  m.querySelector("#pdfOut").onclick=async()=>{setBusy(true);try{captureExportRange();const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportPdf(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
  m.querySelector("#docxOut").onclick=async()=>{setBusy(true);try{captureExportRange();const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportDocx(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
- m.querySelector("#xlsxOut").onclick=()=>{closeModal(m);exportXlsx()};
+ m.querySelector("#xlsxOut").onclick=async()=>{setBusy(true);try{captureExportRange();closeModal(m);await exportXlsx()}catch(e){toast(e.message||"Gagal membuat Excel")}finally{setBusy(false)}};
+ m.querySelector("#importXlsx").onclick=async()=>{const file=m.querySelector('#xlsxImport').files?.[0];if(!file){toast('Pilih file Excel terlebih dahulu');return}if(!state.selected){toast('Pilih kendaraan tujuan terlebih dahulu');return}setBusy(true);try{await importXlsxFile(file);closeModal(m)}catch(e){toast(e.message||'Impor Excel gagal')}finally{setBusy(false)}};
 }
-
 document.addEventListener('input',e=>{
  if(e.target.id==='eventSearch'){const q=e.target.value.toLowerCase();const filtered=state.events.filter(x=>(x.title+' '+x.description+' '+x.event_type).toLowerCase().includes(q));$('#timeline').innerHTML=timelineHtml(filtered)}
 });
