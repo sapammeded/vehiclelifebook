@@ -10,9 +10,9 @@ const addMonths=(d,n,day)=>anchor(d.getFullYear(),d.getMonth()+n,day);
 const fmtDate=d=>new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'long',year:'numeric'}).format(d);
 const monthYear=d=>new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(d);
 let ctx=null,offset=0,day=28;
-function settingsKey(){return 'VL_VEHICLE_PERIOD_V1_'+String(ctx?.user?.id||'guest')}
-function loadSettings(){try{const x=JSON.parse(localStorage.getItem(settingsKey())||'{}');day=Math.min(31,Math.max(1,Number(x.start_day)||28))}catch{day=28}}
-function saveSettings(){localStorage.setItem(settingsKey(),JSON.stringify({start_day:day,updated_at:new Date().toISOString()}))}
+function settingsKey(){return 'VL_SHARED_PERIOD_V1_'+String(ctx?.user?.id||'guest')}
+function loadSettings(){try{const shared=localStorage.getItem(settingsKey());const legacy=localStorage.getItem('VL_VEHICLE_PERIOD_V1_'+String(ctx?.user?.id||'guest'));const x=JSON.parse(shared||legacy||'{}');day=Math.min(31,Math.max(1,Number(x.start_day)||28))}catch{day=28}}
+function saveSettings(){const value=JSON.stringify({start_day:day,updated_at:new Date().toISOString()});localStorage.setItem(settingsKey(),value);localStorage.setItem('VL_VEHICLE_PERIOD_V1_'+String(ctx?.user?.id||'guest'),value)}
 function baseStart(){
  const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12);
  let a=anchor(today.getFullYear(),today.getMonth(),day);
