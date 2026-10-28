@@ -360,19 +360,19 @@ function imageBoxSize(img,maxW,maxH){const r=Math.min(maxW/img.width,maxH/img.he
 function dataUrlToArrayBuffer(dataUrl){const b64=String(dataUrl).split(",")[1]||"";const bin=atob(b64),out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out.buffer}
 async function exportPdf(images=[]){
  await ensureExportEngine('pdf');
- if(!state.events.length){toast("Belum ada data untuk diekspor");return}
+ if(!exportRangeEvents().length){toast("Belum ada data untuk diekspor");return}
  const v=currentVehicle();const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4",compress:true});
  doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text("VEHICLE LIFEBOOK",14,15);
  doc.setFontSize(11);doc.setFont("helvetica","normal");doc.text((v?.brand||"")+" "+(v?.model||"")+" "+(v?.year||"")+"  |  "+(v?.plate_number||""),14,22);
  doc.setFontSize(8);doc.text("Generated "+new Date().toLocaleString("id-ID"),14,28);
- const body=state.events.map(e=>[e.event_date,e.event_type,e.title,rupiah(e.total_cost||0),e.odometer==null?"—":String(e.odometer),e.description||""]);
+ const body=exportRangeEvents().map(e=>[e.event_date,e.event_type,e.title,rupiah(e.total_cost||0),e.odometer==null?"—":String(e.odometer),e.description||""]);
  doc.autoTable({startY:33,head:[["Tanggal","Jenis","Aktivitas","Biaya","Odometer","Keterangan"]],body,styles:{font:"helvetica",fontSize:8,cellPadding:2,overflow:"linebreak",valign:"middle"},headStyles:{fontStyle:"bold"},columnStyles:{0:{cellWidth:25},1:{cellWidth:24},2:{cellWidth:48},3:{cellWidth:32},4:{cellWidth:25},5:{cellWidth:"auto"}},margin:{left:14,right:14,top:33,bottom:14},didDrawPage:d=>{doc.setFontSize(7);doc.text("Vehicle Lifebook • "+d.pageNumber,14,202)}});
  if(images.length)images.forEach((img,idx)=>{doc.addPage();doc.setFont("helvetica","bold");doc.setFontSize(13);doc.text("PHOTO EVIDENCE "+(idx+1),14,16);doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(img.name.slice(0,90),14,22);const box=imageBoxSize(img,260,168),x=(297-box.w)/2,y=28+(168-box.h)/2;doc.addImage(img.dataUrl,"JPEG",x,y,box.w,box.h,undefined,"MEDIUM");doc.setFontSize(7);doc.text("Vehicle Lifebook • "+(idx+1)+" / "+images.length,14,202)});
  doc.save("vehicle-lifebook-"+(v?.plate_number||"vehicle").replace(/\s+/g,"-")+".pdf");toast(images.length?"PDF selesai • "+images.length+" foto masuk":"PDF selesai")
 }
 async function exportDocx(images=[]){
  await ensureExportEngine('docx');
- if(!state.events.length){toast("Belum ada data untuk diekspor");return}
+ if(!exportRangeEvents().length){toast("Belum ada data untuk diekspor");return}
  if(!window.docx){toast("Word engine belum termuat. Coba refresh halaman.");return}
  const {Document,Packer,Paragraph,TextRun,HeadingLevel,ImageRun}=window.docx,v=currentVehicle();
  const children=[new Paragraph({text:"VEHICLE LIFEBOOK",heading:HeadingLevel.TITLE}),new Paragraph({children:[new TextRun({text:[v?.brand,v?.model,v?.year].filter(Boolean).join(" · "),bold:true})]}),new Paragraph({text:"Nomor kendaraan: "+(v?.plate_number||"—")}),new Paragraph({text:"Generated: "+new Date().toLocaleString("id-ID")}),new Paragraph({text:"RIWAYAT AKTIVITAS",heading:HeadingLevel.HEADING_1})];
@@ -1025,8 +1025,8 @@ function openExportModal(){
  const refreshPhotos=()=>{const box=m.querySelector("#photoPreview"),count=m.querySelector("#photoCount");count.textContent=selectedFiles.length?selectedFiles.length+" foto dipilih":"Belum ada foto";box.innerHTML="";selectedFiles.slice(0,12).forEach(f=>{const u=URL.createObjectURL(f),im=document.createElement("img");im.src=u;im.className="photo-thumb";box.appendChild(im);setTimeout(()=>URL.revokeObjectURL(u),3000)})};
  const addFiles=list=>{selectedFiles.push(...Array.from(list||[]).filter(f=>/^image\//i.test(f.type)));refreshPhotos()};
  m.querySelector("#exportPhotos").onchange=e=>addFiles(e.target.files);m.querySelector("#cameraPhoto").onclick=()=>m.querySelector("#exportCamera").click();m.querySelector("#exportCamera").onchange=e=>addFiles(e.target.files);
- m.querySelector("#pdfOut").onclick=async()=>{setBusy(true);try{const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportPdf(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
- m.querySelector("#docxOut").onclick=async()=>{setBusy(true);try{const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportDocx(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
+ m.querySelector("#pdfOut").onclick=async()=>{setBusy(true);try{captureExportRange();const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportPdf(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
+ m.querySelector("#docxOut").onclick=async()=>{setBusy(true);try{captureExportRange();const imgs=await prepareExportImages(selectedFiles);closeModal(m);await exportDocx(imgs)}catch(e){toast(e.message||"Gagal menyiapkan foto")}finally{setBusy(false)}};
  m.querySelector("#xlsxOut").onclick=()=>{closeModal(m);exportXlsx()};
 }
 
