@@ -70,6 +70,7 @@ body{background:linear-gradient(180deg,#f8faff 0,#f4f6fb 55%,#f7f8fc 100%)}
 <script src="js/automotive-ai-guard.js?v=20260930-0300"></script>
 <script src="js/vehicle-intelligence-ui.js?v=20260930-0600"></script>
 <script src="js/personal-finance.js?v=20261028-1"></script>
+<script src="js/vehicle-periods.js?v=20261028-1"></script>
 <script>
 'use strict';
 
@@ -81,6 +82,7 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_tbZtn-XgNx6debKlgxIsYw_xCqCz8lD';
 const WELCOME_VIDEO='assets/welcome/welcome.mp4';
 const state={sb:null,user:null,vehicles:[],selected:null,events:[],mediaByEvent:{},storageUsage:null,busy:false,voice:null,plan:'demo',configuredPlan:'demo',accessValid:true,accessState:'demo',license:null,licenseStatus:null,licenseExpiresAt:null,maxVehicles:1,maxEvents:20};
 window.VehicleLifebookFinanceContext=()=>({sb:state.sb,user:state.user,toast});
+window.VehicleLifebookPeriodContext=()=>({sb:state.sb,user:state.user,vehicles:state.vehicles,selected:state.selected,events:state.events,toast,timelineHtml,openEventMediaModal,openEditEventModal,deleteEvent,renderApp});
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -603,7 +605,7 @@ function renderApp(){
  const totalCost=state.events.reduce((a,e)=>a+Number(e.total_cost||0),0);
  $('#app').innerHTML='<div class="app"><header class="top"><div class="topin"><div class="brand">Vehicle Lifebook<small>'+planLabel+' · '+planStatus+'</small></div><div class="row"><span class="small muted">'+esc(state.user?.email||'')+'</span>'+licenseButton+'<button class="btn gray" id="logout">Keluar</button></div></div></header>'+
  '<main class="wrap"><section class="hero card" style="position:relative;overflow:hidden"><div class="row between wraprow" style="position:relative;z-index:1"><div><div class="small" style="color:#a5b4fc;font-weight:700;letter-spacing:.14em">VEHICLE INTELLIGENCE</div><h2 style="margin:6px 0 4px;font-size:clamp(25px,4vw,36px)">Your Vehicle. Your Story.</h2><div class="small" style="color:#cbd5e1;max-width:560px">Riwayat, kondisi, biaya, bukti dan intelligence kendaraan dalam satu Lifebook.</div></div><button class="btn" style="background:#fff;color:#0f172a" id="addVehicle">＋ Kendaraan</button></div></section>'+
- '<div class="tabs" style="margin-top:10px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">🧠 Automotive Expert '+expertLabel+'</button><button class="tab" id="financeBtn">💰 Keuangan</button><button class="tab" id="exportBtn">↥ Export</button>'+ownerButton+'</div>'+
+ '<div class="tabs" style="margin-top:10px"><button class="tab active">Dashboard</button><button class="tab" id="expertBtn">🧠 Automotive Expert '+expertLabel+'</button><button class="tab" id="financeBtn">💰 Keuangan</button><button class="tab" id="vehiclePeriodBtn">📅 Periode Kendaraan</button><button class="tab" id="exportBtn">↥ Export</button>'+ownerButton+'</div>'+
  '<section class="dashboard-stats"><div class="card stat-card"><div class="stat-icon">🚘</div><div class="stat-label">KENDARAAN</div><div class="stat-value">'+state.vehicles.length+'</div></div><div class="card stat-card"><div class="stat-icon">◷</div><div class="stat-label">AKTIVITAS</div><div class="stat-value">'+state.events.length+'</div></div><div class="card stat-card"><div class="stat-icon">Rp</div><div class="stat-label">TOTAL BIAYA</div><div class="stat-value" style="font-size:17px">'+rupiah(totalCost)+'</div></div>'+storageSummaryHtml().replace('<div class="card">','<div class="card stat-card">').replace('<div class="small muted">Cloud storage</div>','<div class="stat-icon">☁️</div><div class="stat-label">CLOUD STORAGE</div>')+'</section>'+
  '<section class="card vehicle-panel"><div class="vehicle-panel-head"><div><h3 style="margin:0">Garasi Saya</h3><div class="small muted">Pilih kendaraan untuk membuka Lifebook</div></div><button class="btn ghost" id="voiceBtn">🎙️ Voice</button></div><div class="vehicle-list">'+vehicleCards+'</div></section>'+
  (v?'<section class="selected-vehicle"><div class="card"><div class="selected-head"><div><div class="small muted">KENDARAAN TERPILIH</div><div class="selected-plate">'+esc(v.plate_number)+'</div><div class="muted small">'+esc([v.brand,v.model,v.variant,v.year].filter(Boolean).join(' · '))+'</div></div><div class="action-row"><button class="btn ghost" id="vehicleIntelBtn">🧬 Intelligence</button><button class="btn ghost" id="globalAutoBtn">🧠 Global</button><button class="btn gray" id="editVehicleBtn">✏️ Edit</button><button class="btn danger" id="deleteVehicleBtn">🗑️ Hapus</button><button class="btn primary" id="addEvent">＋ Aktivitas</button></div></div><div class="two" style="margin-top:17px"><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">ODOMETER</div><strong>'+ (v.current_odometer==null?'—':Number(v.current_odometer).toLocaleString('id-ID')+' km')+'</strong></div><div class="card" style="padding:12px;box-shadow:none;background:#f8fafc"><div class="small muted">AKTIVITAS TERCATAT</div><strong>'+state.events.length+'</strong></div></div></div><div class="card timeline-card"><div class="timeline-head"><div><h3 style="margin:0">Timeline</h3><div class="small muted">Jejak perawatan dan kejadian kendaraan</div></div><input id="eventSearch" placeholder="⌕  Cari aktivitas..."></div><div id="timeline" style="margin-top:13px">'+timelineHtml(state.events)+'</div></div></section>':'')+'</main></div>';
@@ -615,6 +617,7 @@ function renderApp(){
  const expertBtn=$('#expertBtn');if(expertBtn)expertBtn.onclick=()=>openExpertModal();
  const exportBtn=$('#exportBtn');if(exportBtn)exportBtn.onclick=()=>openExportModal();
  const financeBtn=$('#financeBtn');if(financeBtn)financeBtn.onclick=()=>window.VehicleFinance?.open();
+ const vehiclePeriodBtn=$('#vehiclePeriodBtn');if(vehiclePeriodBtn)vehiclePeriodBtn.onclick=()=>window.VehicleLifebookPeriods?.open();
  const addEvent=$('#addEvent');if(addEvent)addEvent.onclick=()=>openEventModal();
  const intelBtn=$('#vehicleIntelBtn');if(intelBtn)intelBtn.onclick=()=>window.VehicleLifebookIntelligence.open(state.selected);
  const globalAutoBtn=$('#globalAutoBtn');if(globalAutoBtn)globalAutoBtn.onclick=()=>openGlobalAutomotiveModal();
